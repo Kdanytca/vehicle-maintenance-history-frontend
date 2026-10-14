@@ -238,7 +238,7 @@ onMounted(load)
         <select v-model="form.id_usuario_encargado" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
           <option value="">Seleccione el encargado...</option>
           <option v-for="mecanico in mecanicos" :key="mecanico.id_usuario" :value="mecanico.id_usuario">
-            {{ mecanico.username }}
+            {{ mecanico.username }} ({{ mecanico.rol?.nombre_rol || 'sin rol' }})
           </option>
         </select>
         <p v-if="mecanicoSinCupo" class="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400">
@@ -344,7 +344,7 @@ onMounted(load)
 
               <td class="p-4 whitespace-nowrap">
                 <span v-if="item.encargado" class="inline-flex items-center gap-1.5 text-xs text-slate-300">
-                  <i class="fa-solid fa-user-gear text-[11px] text-slate-500"></i>{{ item.encargado.username }}
+                  <i class="fa-solid fa-user-gear text-[11px] text-slate-500"></i>{{ item.encargado.username }} ({{ item.encargado.rol?.nombre_rol || 'sin rol' }})
                 </span>
                 <span v-else class="text-xs text-slate-600 italic">Sin asignar</span>
               </td>
