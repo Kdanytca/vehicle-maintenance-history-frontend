@@ -21,6 +21,18 @@ const editingId = ref(null)
 const error = ref('')
 const success = ref('')
 const mecanicoSeleccionado = ref('')
+const fechaInicio = ref('')
+const fechaFin = ref('')
+const filterError = ref('')
+const loading = ref(false)
+
+const hasDateRange = computed(() => Boolean(fechaInicio.value && fechaFin.value))
+
+function getDateRangeParams() {
+  return hasDateRange.value
+    ? { fecha_inicio: fechaInicio.value, fecha_fin: fechaFin.value }
+    : {}
+}
 
 // Identifica el rol usando la relación que devuelve la API.
 function obtenerNombreRol(usuario) {
@@ -95,9 +107,13 @@ function badgeClass(estado) {
   return 'bg-rose-500/10 text-rose-400 border-rose-500/20'
 }
 
-async function load() {
+async function load(params = {}) {
+  loading.value = true
+  error.value = ''
+  filterError.value = ''
+
   try {
-    const { data } = await api.get('/mantenimientos')
+    const { data } = await api.get('/mantenimientos', { params })
 
     mantenimientos.value = data.mantenimientos
     usuarios.value = data.usuarios
@@ -107,10 +123,43 @@ async function load() {
       form.id_usuario_encargado = auth.user.id_usuario
     }
   } catch (exception) {
-    error.value =
+    const message =
+      exception.response?.data?.errors?.fecha_inicio?.[0] ||
+      exception.response?.data?.errors?.fecha_fin?.[0] ||
       exception.response?.data?.message ||
       'No se pudieron cargar los mantenimientos.'
+
+    if (Object.keys(params).length > 0) {
+      filterError.value = message
+    } else {
+      error.value = message
+    }
+  } finally {
+    loading.value = false
   }
+}
+
+async function filterByDate() {
+  filterError.value = ''
+
+  if (!fechaInicio.value || !fechaFin.value) {
+    filterError.value = 'Selecciona las dos fechas para filtrar el rango.'
+    return
+  }
+
+  if (fechaInicio.value > fechaFin.value) {
+    filterError.value = 'La fecha desde no puede ser posterior a la fecha hasta.'
+    return
+  }
+
+  await load(getDateRangeParams())
+}
+
+async function clearDateFilter() {
+  fechaInicio.value = ''
+  fechaFin.value = ''
+  filterError.value = ''
+  await load()
 }
 
 async function save() {
@@ -133,7 +182,7 @@ async function save() {
     }
 
     resetForm()
-    await load()
+    await load(getDateRangeParams())
   } catch (exception) {
     error.value =
       exception.response?.data?.errors?.id_usuario_encargado?.[0] ||
@@ -151,7 +200,7 @@ async function cancel(id) {
     await api.delete(`/mantenimientos/${id}`)
     success.value = 'Orden de mantenimiento cancelada.'
     error.value = ''
-    await load()
+    await load(getDateRangeParams())
   } catch (exception) {
     error.value =
       exception.response?.data?.message ||
@@ -291,6 +340,35 @@ onMounted(load)
     </p>
 
     <div class="bg-[#1e293b] rounded-xl border border-slate-800 p-5 mb-4">
+      <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 items-end">
+        <div>
+          <label for="fecha-inicio" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+            Fecha desde
+          </label>
+          <input id="fecha-inicio" v-model="fechaInicio" type="date" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500" />
+        </div>
+
+        <div>
+          <label for="fecha-fin" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+            Fecha hasta
+          </label>
+          <input id="fecha-fin" v-model="fechaFin" type="date" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500" />
+        </div>
+
+        <div class="flex gap-2 sm:col-span-2 xl:col-span-1">
+          <button type="button" class="flex-1 xl:flex-none bg-sky-500 hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition" :disabled="loading" @click="filterByDate">
+            <i class="fa-solid fa-filter mr-1.5"></i> Filtrar
+          </button>
+          <button type="button" class="flex-1 xl:flex-none bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-200 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition" :disabled="loading" @click="clearDateFilter">
+            <i class="fa-solid fa-xmark mr-1.5"></i> Limpiar
+          </button>
+        </div>
+      </div>
+
+      <p v-if="filterError" role="alert" class="mb-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm">
+        {{ filterError }}
+      </p>
+
       <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div class="flex-1">
           <label for="filtro-mecanico" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
@@ -327,7 +405,14 @@ onMounted(load)
           </thead>
 
           <tbody class="divide-y divide-slate-800/60 text-slate-300">
-            <tr v-for="item in mantenimientosFiltrados" :key="item.id_mantenimiento" class="hover:bg-slate-800/30 transition-colors">
+            <tr v-if="loading">
+              <td colspan="7" class="px-4 py-12 text-center text-sky-400" role="status" aria-live="polite">
+                <i class="fa-solid fa-spinner fa-spin mr-2"></i>
+                Cargando mantenimientos...
+              </td>
+            </tr>
+
+            <tr v-else v-for="item in mantenimientosFiltrados" :key="item.id_mantenimiento" class="hover:bg-slate-800/30 transition-colors">
               <td class="p-4 font-mono text-xs text-slate-400">{{ item.id_mantenimiento }}</td>
               <td class="p-4 whitespace-nowrap text-slate-200 font-mono text-xs">{{ item.fecha_servicio }}</td>
               <td class="p-4 max-w-xs truncate text-slate-300">{{ item.descripcion_falla }}</td>
@@ -359,13 +444,15 @@ onMounted(load)
               </td>
             </tr>
 
-            <tr v-if="mantenimientosFiltrados.length === 0">
+            <tr v-if="!loading && mantenimientosFiltrados.length === 0">
               <td colspan="7" class="px-4 py-12 text-center text-slate-500">
                 <i class="fa-solid fa-folder-open text-3xl mb-3 block text-slate-600"></i>
                 <span class="text-sm font-medium">
-                  {{ mecanicoSeleccionado
-                    ? 'No hay mantenimientos registrados para el mecánico seleccionado.'
-                    : 'No se han registrado órdenes de mantenimiento en el sistema.' }}
+                  {{ hasDateRange
+                    ? 'No se encontraron mantenimientos en el rango seleccionado'
+                    : mecanicoSeleccionado
+                      ? 'No hay mantenimientos registrados para el mecánico seleccionado.'
+                      : 'No se han registrado órdenes de mantenimiento en el sistema.' }}
                 </span>
               </td>
             </tr>

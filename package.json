@@ -16,5 +16,9 @@
     "vue": "^3.5.18",
     "vue-router": "^4.5.1"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "vue-demi@0.14.10": true
+  }
 }
