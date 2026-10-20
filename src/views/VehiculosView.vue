@@ -1,6 +1,10 @@
 <script setup>
+<<<<<<< HEAD
 import { onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+=======
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+>>>>>>> 05ca552ab34d24c6a87d40a185a24db424aa4088
 import api from '../api'
 
 const vehiculos = ref([])
@@ -10,7 +14,16 @@ const success = ref('')
 const showForm = ref(false)
 const editingId = ref(null)
 const termino = ref('')
+<<<<<<< HEAD
 const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
+=======
+const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '' })
+
+// Validación provisional del formato de placa definido para este PBI.
+const placaValida = computed(() =>
+  /^(RE|AB|MI|CC|CD|P|A|C|M|D|T|N|V)[0-9]{3}-[0-9]{3}$/i.test(form.placa.trim())
+)
+>>>>>>> 05ca552ab34d24c6a87d40a185a24db424aa4088
 const deleteModal = reactive({ show: false, vehiculo: null, impacto: null, cancelarPendientes: false })
 const simpleDeleteModal = reactive({ show: false, vehiculo: null })
 let searchTimeout = null
@@ -77,6 +90,15 @@ async function search() {
 
 async function save() {
   error.value = ''
+  success.value = ''
+
+  if (!placaValida.value) {
+    error.value = 'Formato de placa inválido. Usa el formato esperado, por ejemplo P123-456.'
+    return
+  }
+
+  // Normaliza la placa antes de enviarla a la API.
+  form.placa = form.placa.trim().toUpperCase()
 
   try {
     if (editingId.value) {
@@ -89,7 +111,10 @@ async function save() {
     resetForm()
     await load()
   } catch (exception) {
-    error.value = exception.response?.data?.message || 'No se pudo guardar el vehículo'
+    error.value =
+      exception.response?.data?.errors?.placa?.[0] ||
+      exception.response?.data?.message ||
+      'No se pudo guardar el vehículo'
   }
 }
 
@@ -193,7 +218,23 @@ watch(termino, () => {
     <form v-if="showForm" class="bg-[#1e293b] rounded-xl border border-slate-800 shadow-xl overflow-hidden p-6 space-y-6 mb-6" @submit.prevent="save">
       <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-car bg-sky-500/10 text-sky-400 p-2 rounded-lg text-sm"></i> {{ editingId ? 'Editar Vehículo' : 'Registrar Nuevo Vehículo' }}</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Placa</label><input v-model="form.placa" required placeholder="P123-456" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition" /></div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Placa</label>
+          <input
+            v-model="form.placa"
+            required
+            maxlength="10"
+            placeholder="P123-456"
+            @input="form.placa = form.placa.toUpperCase()"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition"
+          />
+          <p v-if="form.placa && !placaValida" class="mt-2 text-xs text-rose-400">
+            Formato inválido. Ejemplo esperado: P123-456.
+          </p>
+          <p v-else-if="placaValida" class="mt-2 text-xs text-emerald-400">
+            Formato de placa válido.
+          </p>
+        </div>
         <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Marca</label><input v-model="form.marca" required placeholder="Ej: Toyota" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
         <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Modelo</label><input v-model="form.modelo" required placeholder="Ej: Corolla" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
         <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Año</label><input v-model="form.anio" required type="number" min="1900" :max="new Date().getFullYear() + 1" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition" /></div>
@@ -238,7 +279,13 @@ watch(termino, () => {
       <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-lg text-sm">{{ error }}</p>
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/60">
         <button type="button" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 rounded-lg text-sm font-bold transition" @click="resetForm">Cancelar</button>
-        <button class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-sky-500/10"><i class="fa-solid fa-floppy-disk text-xs"></i> {{ editingId ? 'Actualizar Vehículo' : 'Guardar Vehículo' }}</button>
+        <button
+          :disabled="!placaValida"
+          class="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-sky-500/10"
+        >
+          <i class="fa-solid fa-floppy-disk text-xs"></i>
+          {{ editingId ? 'Actualizar Vehículo' : 'Guardar Vehículo' }}
+        </button>
       </div>
     </form>
 
