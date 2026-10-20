@@ -10,7 +10,7 @@ import RolesView from './views/RolesView.vue'
 import UsuariosView from './views/UsuariosView.vue'
 import VehiculosView from './views/VehiculosView.vue'
 import VehiculoDetalleView from './views/VehiculoDetalleView.vue'
-import ClientesView from './views/clientesView.vue'
+import ClientesView from './views/ClientesView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
