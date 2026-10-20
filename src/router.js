@@ -10,6 +10,7 @@ import RolesView from './views/RolesView.vue'
 import UsuariosView from './views/UsuariosView.vue'
 import VehiculosView from './views/VehiculosView.vue'
 import VehiculoDetalleView from './views/VehiculoDetalleView.vue'
+import ClientesView from './views/clientesView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: '/', redirect: '/vehiculos' },
     { path: '/vehiculos', component: VehiculosView, meta: { auth: true } },
     { path: '/vehiculos/:id', component: VehiculoDetalleView, meta: { auth: true } },
+    { path: '/clientes', component: ClientesView, meta: { auth: true } },
     { path: '/mantenimientos', component: MantenimientosView, meta: { auth: true } },
     { path: '/repuestos', component: RepuestosView, meta: { auth: true } },
     { path: '/alertas', component: AlertasView, meta: { auth: true } },

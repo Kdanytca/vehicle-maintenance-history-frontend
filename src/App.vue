@@ -12,6 +12,7 @@ const showShell = computed(() => route.path !== '/login')
 
 const links = computed(() => [
   { to: '/vehiculos', label: 'Vehículos', icon: 'fa-car-side' },
+  { to: '/clientes', label: 'Clientes', icon: 'fa-user' },
   { to: '/mantenimientos', label: 'Mantenimientos', icon: 'fa-wrench' },
   { to: '/repuestos', label: 'Repuestos', icon: 'fa-box' },
   { to: '/alertas', label: 'Alertas', icon: 'fa-bell' },
@@ -56,6 +57,8 @@ onMounted(async () => {
             </div>
             <span class="text-xl font-bold text-white tracking-tight">Taller<span class="text-sky-400">SGA</span></span>
           </RouterLink>
+
+          
 
           <nav :class="[
             'text-sm font-medium text-slate-400 lg:flex lg:items-center lg:gap-2',
