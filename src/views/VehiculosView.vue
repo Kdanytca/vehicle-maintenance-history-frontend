@@ -1,10 +1,6 @@
 <script setup>
-<<<<<<< HEAD
-import { onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-=======
 import { computed, onMounted, reactive, ref, watch } from 'vue'
->>>>>>> 05ca552ab34d24c6a87d40a185a24db424aa4088
+import { RouterLink } from 'vue-router'
 import api from '../api'
 
 const vehiculos = ref([])
@@ -14,16 +10,12 @@ const success = ref('')
 const showForm = ref(false)
 const editingId = ref(null)
 const termino = ref('')
-<<<<<<< HEAD
 const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
-=======
-const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '' })
 
 // Validación provisional del formato de placa definido para este PBI.
 const placaValida = computed(() =>
   /^(RE|AB|MI|CC|CD|P|A|C|M|D|T|N|V)[0-9]{3}-[0-9]{3}$/i.test(form.placa.trim())
 )
->>>>>>> 05ca552ab34d24c6a87d40a185a24db424aa4088
 const deleteModal = reactive({ show: false, vehiculo: null, impacto: null, cancelarPendientes: false })
 const simpleDeleteModal = reactive({ show: false, vehiculo: null })
 let searchTimeout = null
