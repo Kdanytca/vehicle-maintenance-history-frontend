@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { requestActivity } from './requestActivity'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -110,4 +111,18 @@ onMounted(async () => {
     </main>
   </div>
   <RouterView v-else />
+  <Teleport to="body">
+    <div class="request-activity-region" role="status" aria-live="polite" aria-atomic="true">
+      <div v-if="requestActivity.state.visible" class="request-activity">
+        <svg class="request-activity-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="m9.5 3-.5 2-2 1-2-.5-2 3 1.5 1.5v3L3 14.5l2 3 2-.5 2 1 .5 3h5l.5-3 2-1 2 .5 2-3-1.5-1.5v-3L21 8.5l-2-3-2 .5-2-1-.5-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <div>
+          <p class="request-activity-title">Cargando…</p>
+          <p v-if="requestActivity.state.prolonged" class="request-activity-message">El servidor está tardando un poco. Por favor, espera…</p>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
