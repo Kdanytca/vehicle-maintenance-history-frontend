@@ -1,6 +1,8 @@
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import AlertasView from './views/AlertasView.vue'
+import EstadisticasView from './views/EstadisticasView.vue'
 import HistorialView from './views/HistorialView.vue'
 import LoginView from './views/LoginView.vue'
 import MantenimientosView from './views/MantenimientosView.vue'
@@ -21,6 +23,7 @@ const router = createRouter({
     { path: '/vehiculos/:id', component: VehiculoDetalleView, meta: { auth: true } },
     { path: '/clientes', component: ClientesView, meta: { auth: true } },
     { path: '/mantenimientos', component: MantenimientosView, meta: { auth: true } },
+    { path: '/estadisticas', component: EstadisticasView, meta: { auth: true } },
     { path: '/repuestos', component: RepuestosView, meta: { auth: true } },
     { path: '/alertas', component: AlertasView, meta: { auth: true } },
     { path: '/historial', component: HistorialView, meta: { auth: true } },

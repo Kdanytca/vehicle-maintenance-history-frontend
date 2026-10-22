@@ -1,3 +1,4 @@
+
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -15,6 +16,7 @@ const links = computed(() => [
   { to: '/vehiculos', label: 'Vehículos', icon: 'fa-car-side' },
   { to: '/clientes', label: 'Clientes', icon: 'fa-user' },
   { to: '/mantenimientos', label: 'Mantenimientos', icon: 'fa-wrench' },
+  { to: '/estadisticas', label: 'Estadísticas', icon: 'fa-chart-line' },
   { to: '/repuestos', label: 'Repuestos', icon: 'fa-box' },
   { to: '/alertas', label: 'Alertas', icon: 'fa-bell' },
   { to: '/historial', label: 'Historial', icon: 'fa-clock-rotate-left' },
@@ -58,8 +60,6 @@ onMounted(async () => {
             </div>
             <span class="text-xl font-bold text-white tracking-tight">Taller<span class="text-sky-400">SGA</span></span>
           </RouterLink>
-
-          
 
           <nav :class="[
             'text-sm font-medium text-slate-400 lg:flex lg:items-center lg:gap-2',
