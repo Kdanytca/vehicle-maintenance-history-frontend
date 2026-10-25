@@ -1,14 +1,16 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import api from '../api'
 
 const vehiculos = ref([])
+const clientes = ref([])
 const error = ref('')
 const success = ref('')
 const showForm = ref(false)
 const editingId = ref(null)
 const termino = ref('')
-const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '' })
+const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
 
 // Validación provisional del formato de placa definido para este PBI.
 const placaValida = computed(() =>
@@ -18,24 +20,53 @@ const deleteModal = reactive({ show: false, vehiculo: null, impacto: null, cance
 const simpleDeleteModal = reactive({ show: false, vehiculo: null })
 let searchTimeout = null
 
+async function loadClientes() {
+  try {
+    const { data } = await api.get('/clientes')
+    clientes.value = Array.isArray(data) ? data : (data?.clientes || data?.data || [])
+  } catch {
+    const cached = localStorage.getItem('tallersga_clientes_cache')
+    clientes.value = cached ? JSON.parse(cached) : []
+  }
+}
+
 async function load() {
   const { data } = await api.get('/vehiculos')
-  vehiculos.value = data
+  vehiculos.value = Array.isArray(data) ? data : (data?.vehiculos || data?.data || [])
+  await loadClientes()
 }
 
 function resetForm() {
-  Object.assign(form, { placa: '', marca: '', modelo: '', anio: '', propietario: '' })
+  Object.assign(form, { placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
   editingId.value = null
   showForm.value = false
 }
 
+function onClienteSelect() {
+  if (!form.id_cliente) return
+  const found = clientes.value.find((c) => (c.id_cliente || c.id) == form.id_cliente)
+  if (found) {
+    form.propietario = `${found.nombre} ${found.apellido || ''}`.trim()
+  }
+}
+
 function edit(vehiculo) {
+  const matchingCliente = clientes.value.find((c) => {
+    const cId = c.id_cliente || c.id
+    const vCId = vehiculo.id_cliente || vehiculo.cliente_id || vehiculo.propietario?.id_cliente || vehiculo.propietario?.id
+    if (vCId && cId && String(vCId) === String(cId)) return true
+    const cNombre = `${c.nombre || ''} ${c.apellido || ''}`.trim().toLowerCase()
+    const vNombre = (vehiculo.propietario?.nombre || (typeof vehiculo.propietario === 'string' ? vehiculo.propietario : '')).trim().toLowerCase()
+    return cNombre && vNombre && cNombre === vNombre
+  })
+
   Object.assign(form, {
     placa: vehiculo.placa,
     marca: vehiculo.marca,
     modelo: vehiculo.modelo,
     anio: vehiculo.anio,
-    propietario: vehiculo.propietario?.nombre || '',
+    id_cliente: matchingCliente ? (matchingCliente.id_cliente || matchingCliente.id) : (vehiculo.id_cliente || ''),
+    propietario: vehiculo.propietario?.nombre || (typeof vehiculo.propietario === 'string' ? vehiculo.propietario : ''),
   })
   editingId.value = vehiculo.id_vehiculo
   showForm.value = true
@@ -199,7 +230,43 @@ watch(termino, () => {
         <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Marca</label><input v-model="form.marca" required placeholder="Ej: Toyota" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
         <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Modelo</label><input v-model="form.modelo" required placeholder="Ej: Corolla" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
         <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Año</label><input v-model="form.anio" required type="number" min="1900" :max="new Date().getFullYear() + 1" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition" /></div>
-        <div class="md:col-span-2"><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nombre del Propietario</label><input v-model="form.propietario" required placeholder="Ej: Juan Pérez" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
+        <div class="md:col-span-2 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Cliente / Propietario</label>
+            <RouterLink to="/clientes" class="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 font-medium">
+              <i class="fa-solid fa-users text-[10px]"></i> Administrar Clientes
+            </RouterLink>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Seleccionar Cliente Existente</label>
+              <select
+                v-model="form.id_cliente"
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500 transition"
+                @change="onClienteSelect"
+              >
+                <option value="">-- Seleccionar cliente existente --</option>
+                <option
+                  v-for="c in clientes"
+                  :key="c.id_cliente || c.id"
+                  :value="c.id_cliente || c.id"
+                >
+                  {{ c.nombre }} {{ c.apellido || '' }} {{ c.dui ? `(${c.dui})` : '' }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Nombre del Propietario</label>
+              <input
+                v-model="form.propietario"
+                required
+                placeholder="Ej: Juan Pérez"
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition"
+              />
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500">Puedes seleccionar un cliente registrado del sistema o ingresar su nombre directamente.</p>
+        </div>
       </div>
       <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-lg text-sm">{{ error }}</p>
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/60">

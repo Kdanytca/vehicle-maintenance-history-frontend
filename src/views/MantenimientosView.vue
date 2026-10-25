@@ -7,8 +7,10 @@ const auth = useAuthStore()
 const mantenimientos = ref([])
 const usuarios = ref([])
 const vehiculos = ref([])
+
 const form = reactive({
   fecha_servicio: '',
+  tipo_servicio: '',
   descripcion_falla: '',
   estado: 'Pendiente',
   costo_mano_obra: '',
@@ -21,8 +23,8 @@ const editingId = ref(null)
 const error = ref('')
 const success = ref('')
 const mecanicoSeleccionado = ref('')
+const mantenimientoDetalle = ref(null)
 
-// Identifica el rol usando la relación que devuelve la API.
 function obtenerNombreRol(usuario) {
   const rol = usuario.rol
 
@@ -44,6 +46,7 @@ const mecanicos = computed(() =>
     obtenerNombreRol(usuario) === 'mecanico'
   )
 )
+
 const estadosActivos = ['Pendiente', 'En Proceso']
 
 const plazasOcupadas = computed(() => {
@@ -52,12 +55,14 @@ const plazasOcupadas = computed(() => {
   if (!idMecanico || !estadosActivos.includes(form.estado)) {
     return 0
   }
-   return mantenimientos.value.filter(item =>
+
+  return mantenimientos.value.filter(item =>
     String(item.id_usuario_encargado) === String(idMecanico) &&
     estadosActivos.includes(item.estado) &&
     String(item.id_mantenimiento) !== String(editingId.value ?? '')
   ).length
 })
+
 const mecanicoSinCupo = computed(() =>
   Boolean(form.id_usuario_encargado) &&
   estadosActivos.includes(form.estado) &&
@@ -162,6 +167,7 @@ async function cancel(id) {
 function edit(item) {
   Object.assign(form, {
     fecha_servicio: item.fecha_servicio,
+    tipo_servicio: item.tipo_servicio || '',
     descripcion_falla: item.descripcion_falla,
     estado: item.estado,
     costo_mano_obra: item.costo_mano_obra,
@@ -171,12 +177,18 @@ function edit(item) {
 
   editingId.value = item.id_mantenimiento
   showForm.value = true
+  mantenimientoDetalle.value = null
   error.value = ''
+}
+
+function verDetalle(item) {
+  mantenimientoDetalle.value = item
 }
 
 function resetForm() {
   Object.assign(form, {
     fecha_servicio: '',
+    tipo_servicio: '',
     descripcion_falla: '',
     estado: 'Pendiente',
     costo_mano_obra: '',
@@ -207,7 +219,7 @@ onMounted(load)
 
       <button
         class="bg-sky-500 hover:bg-sky-600 transition text-slate-900 px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-sky-500/10"
-        @click="showForm = true; editingId = null; error = ''"
+        @click="showForm = true; editingId = null; resetForm(); showForm = true"
       >
         <i class="fa-solid fa-plus"></i> Nuevo Mantenimiento
       </button>
@@ -220,14 +232,41 @@ onMounted(load)
     >
       <div>
         <label class="block text-xs font-semibold text-slate-400 mb-1">Fecha de Servicio *</label>
-        <input v-model="form.fecha_servicio" required type="date" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500" />
+        <input
+          v-model="form.fecha_servicio"
+          required
+          type="date"
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        />
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Tipo de Servicio</label>
+        <select
+          v-model="form.tipo_servicio"
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        >
+          <option value="">Seleccione el tipo de servicio...</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Predictivo">Predictivo</option>
+          <option value="Otro">Otro</option>
+        </select>
       </div>
 
       <div>
         <label class="block text-xs font-semibold text-slate-400 mb-1">Vehículo *</label>
-        <select v-model="form.id_vehiculo" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+        <select
+          v-model="form.id_vehiculo"
+          required
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        >
           <option value="">Seleccione el vehículo...</option>
-          <option v-for="vehiculo in vehiculos" :key="vehiculo.id_vehiculo" :value="vehiculo.id_vehiculo">
+          <option
+            v-for="vehiculo in vehiculos"
+            :key="vehiculo.id_vehiculo"
+            :value="vehiculo.id_vehiculo"
+          >
             {{ vehiculo.placa }} - {{ vehiculo.marca }} {{ vehiculo.modelo }}
           </option>
         </select>
@@ -235,9 +274,17 @@ onMounted(load)
 
       <div>
         <label class="block text-xs font-semibold text-slate-400 mb-1">Encargado Interno *</label>
-        <select v-model="form.id_usuario_encargado" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+        <select
+          v-model="form.id_usuario_encargado"
+          required
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        >
           <option value="">Seleccione el encargado...</option>
-          <option v-for="mecanico in mecanicos" :key="mecanico.id_usuario" :value="mecanico.id_usuario">
+          <option
+            v-for="mecanico in mecanicos"
+            :key="mecanico.id_usuario"
+            :value="mecanico.id_usuario"
+          >
             {{ mecanico.username }} ({{ mecanico.rol?.nombre_rol || 'sin rol' }})
           </option>
         </select>
@@ -249,7 +296,11 @@ onMounted(load)
 
       <div>
         <label class="block text-xs font-semibold text-slate-400 mb-1">Estado *</label>
-        <select v-model="form.estado" required class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+        <select
+          v-model="form.estado"
+          required
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        >
           <option>Pendiente</option>
           <option>En Proceso</option>
           <option>Completado</option>
@@ -259,12 +310,22 @@ onMounted(load)
 
       <div>
         <label class="block text-xs font-semibold text-slate-400 mb-1">Costo Mano de Obra</label>
-        <input v-model="form.costo_mano_obra" type="number" step="0.01" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500" />
+        <input
+          v-model="form.costo_mano_obra"
+          type="number"
+          step="0.01"
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        />
       </div>
 
-      <div>
+      <div class="md:col-span-2">
         <label class="block text-xs font-semibold text-slate-400 mb-1">Descripción de Falla *</label>
-        <textarea v-model="form.descripcion_falla" required rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></textarea>
+        <textarea
+          v-model="form.descripcion_falla"
+          required
+          rows="3"
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+        ></textarea>
       </div>
 
       <p v-if="error" class="md:col-span-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm">
@@ -272,7 +333,11 @@ onMounted(load)
       </p>
 
       <div class="md:col-span-2 flex justify-end gap-3">
-        <button type="button" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 text-xs font-bold rounded-lg" @click="resetForm">
+        <button
+          type="button"
+          class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 text-xs font-bold rounded-lg"
+          @click="resetForm"
+        >
           Cancelar
         </button>
         <button class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg">
@@ -296,9 +361,17 @@ onMounted(load)
           <label for="filtro-mecanico" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
             Filtrar por mecánico responsable
           </label>
-          <select id="filtro-mecanico" v-model="mecanicoSeleccionado" class="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500">
+          <select
+            id="filtro-mecanico"
+            v-model="mecanicoSeleccionado"
+            class="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+          >
             <option value="">Todos los responsables</option>
-            <option v-for="mecanico in mecanicos" :key="mecanico.id_usuario" :value="mecanico.id_usuario">
+            <option
+              v-for="mecanico in mecanicos"
+              :key="mecanico.id_usuario"
+              :value="mecanico.id_usuario"
+            >
               {{ mecanico.username }}
             </option>
           </select>
@@ -318,6 +391,7 @@ onMounted(load)
             <tr class="bg-slate-900/50 border-b border-slate-800 text-slate-400">
               <th class="p-4 font-semibold text-xs uppercase tracking-wider">ID</th>
               <th class="p-4 font-semibold text-xs uppercase tracking-wider">Fecha</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Tipo de servicio</th>
               <th class="p-4 font-semibold text-xs uppercase tracking-wider">Descripción</th>
               <th class="p-4 font-semibold text-xs uppercase tracking-wider">Estado</th>
               <th class="p-4 font-semibold text-xs uppercase tracking-wider">Vehículo</th>
@@ -327,9 +401,14 @@ onMounted(load)
           </thead>
 
           <tbody class="divide-y divide-slate-800/60 text-slate-300">
-            <tr v-for="item in mantenimientosFiltrados" :key="item.id_mantenimiento" class="hover:bg-slate-800/30 transition-colors">
+            <tr
+              v-for="item in mantenimientosFiltrados"
+              :key="item.id_mantenimiento"
+              class="hover:bg-slate-800/30 transition-colors"
+            >
               <td class="p-4 font-mono text-xs text-slate-400">{{ item.id_mantenimiento }}</td>
               <td class="p-4 whitespace-nowrap text-slate-200 font-mono text-xs">{{ item.fecha_servicio }}</td>
+              <td class="p-4 whitespace-nowrap text-slate-300">{{ item.tipo_servicio || 'No especificado' }}</td>
               <td class="p-4 max-w-xs truncate text-slate-300">{{ item.descripcion_falla }}</td>
 
               <td class="p-4 whitespace-nowrap">
@@ -344,23 +423,39 @@ onMounted(load)
 
               <td class="p-4 whitespace-nowrap">
                 <span v-if="item.encargado" class="inline-flex items-center gap-1.5 text-xs text-slate-300">
-                  <i class="fa-solid fa-user-gear text-[11px] text-slate-500"></i>{{ item.encargado.username }} ({{ item.encargado.rol?.nombre_rol || 'sin rol' }})
+                  <i class="fa-solid fa-user-gear text-[11px] text-slate-500"></i>
+                  {{ item.encargado.username }} ({{ item.encargado.rol?.nombre_rol || 'sin rol' }})
                 </span>
                 <span v-else class="text-xs text-slate-600 italic">Sin asignar</span>
               </td>
 
               <td class="p-4 text-right space-x-1.5 whitespace-nowrap">
-                <button class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-blue-500/20 text-blue-400 rounded-lg text-xs font-medium border border-slate-700/60 transition" title="Editar mantenimiento" @click="edit(item)">
+                <button
+                  class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-sky-500/20 text-sky-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
+                  title="Ver detalle"
+                  @click="verDetalle(item)"
+                >
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+                <button
+                  class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-blue-500/20 text-blue-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
+                  title="Editar mantenimiento"
+                  @click="edit(item)"
+                >
                   <i class="fa-solid fa-pen"></i>
                 </button>
-                <button class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium border border-slate-700/60 transition" title="Cancelar orden" @click="cancel(item.id_mantenimiento)">
+                <button
+                  class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
+                  title="Cancelar orden"
+                  @click="cancel(item.id_mantenimiento)"
+                >
                   <i class="fa-solid fa-ban"></i>
                 </button>
               </td>
             </tr>
 
             <tr v-if="mantenimientosFiltrados.length === 0">
-              <td colspan="7" class="px-4 py-12 text-center text-slate-500">
+              <td colspan="8" class="px-4 py-12 text-center text-slate-500">
                 <i class="fa-solid fa-folder-open text-3xl mb-3 block text-slate-600"></i>
                 <span class="text-sm font-medium">
                   {{ mecanicoSeleccionado
@@ -371,6 +466,53 @@ onMounted(load)
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div
+      v-if="mantenimientoDetalle"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      @click.self="mantenimientoDetalle = null"
+    >
+      <div class="w-full max-w-lg rounded-xl border border-slate-700 bg-[#1e293b] p-6 shadow-2xl">
+        <div class="mb-5 flex items-center justify-between">
+          <h2 class="text-lg font-bold text-white">
+            Detalle del mantenimiento #{{ mantenimientoDetalle.id_mantenimiento }}
+          </h2>
+          <button
+            class="text-slate-400 hover:text-white"
+            title="Cerrar detalle"
+            @click="mantenimientoDetalle = null"
+          >
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4 text-sm">
+          <div>
+            <p class="text-xs text-slate-400">Fecha de servicio</p>
+            <p class="mt-1 text-white">{{ mantenimientoDetalle.fecha_servicio || 'No disponible' }}</p>
+          </div>
+
+          <div>
+            <p class="text-xs text-slate-400">Tipo de servicio</p>
+            <p class="mt-1 text-white">{{ mantenimientoDetalle.tipo_servicio || 'No especificado' }}</p>
+          </div>
+
+          <div>
+            <p class="text-xs text-slate-400">Descripción de la falla</p>
+            <p class="mt-1 whitespace-pre-wrap text-white">{{ mantenimientoDetalle.descripcion_falla || 'Sin descripción' }}</p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button
+            class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-sky-600"
+            @click="mantenimientoDetalle = null"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   </section>
