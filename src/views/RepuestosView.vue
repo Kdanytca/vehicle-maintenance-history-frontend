@@ -7,7 +7,9 @@ const vehiculos = ref([])
 const showModal = ref(false)
 const error = ref('')
 const success = ref('')
-const form = reactive({ id_vehiculo: '', comprobante_pdf: null, cantidad_recibida: 1, costo_unitario: 0 })
+const conGarantia = ref(false)
+const uploading = ref(false)
+const form = reactive({ id_vehiculo: '', comprobante_pdf: null, cantidad_recibida: 1, costo_unitario: 0, garantia_inicio: '', garantia_fin: '' })
 
 function pdfUrl(path) {
   if (!path) return '#'
@@ -22,19 +24,26 @@ async function load() {
 }
 
 async function upload() {
+  if (uploading.value) return
+  uploading.value = true
   error.value = ''
   success.value = ''
 
   try {
     const payload = new FormData()
-    Object.entries(form).forEach(([key, value]) => payload.append(key, value))
+    Object.entries(form).forEach(([key, value]) => {
+      if (!key.startsWith('garantia_') || conGarantia.value) payload.append(key, value)
+    })
     const { data } = await api.post('/repuestos/cargar-pdf', payload, { headers: { 'Content-Type': 'multipart/form-data' } })
-    Object.assign(form, { id_vehiculo: '', comprobante_pdf: null, cantidad_recibida: 1, costo_unitario: 0 })
+    Object.assign(form, { id_vehiculo: '', comprobante_pdf: null, cantidad_recibida: 1, costo_unitario: 0, garantia_inicio: '', garantia_fin: '' })
+    conGarantia.value = false
     success.value = data.message || 'Factura procesada correctamente.'
     showModal.value = false
     await load()
   } catch (exception) {
     error.value = exception.response?.data?.message || 'No se pudo procesar la factura.'
+  } finally {
+    uploading.value = false
   }
 }
 
@@ -57,10 +66,20 @@ onMounted(load)
     </div>
 
     <div v-if="showModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity duration-300">
-      <form class="bg-[#1e293b] border border-slate-800 w-full max-w-md rounded-xl overflow-hidden shadow-2xl" @submit.prevent="upload">
+      <form class="bg-[#1e293b] border border-slate-800 w-full max-w-md rounded-xl overflow-y-auto max-h-[90vh] shadow-2xl" @submit.prevent="upload">
         <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-white text-base">Cargar Repuestos vía Factura PDF</h3><button type="button" class="text-slate-400 hover:text-white text-sm" @click="showModal = false"><i class="fa-solid fa-xmark"></i></button></div>
         <div class="p-6 space-y-4"><div><label class="block text-xs font-semibold text-slate-400 mb-1">Vehículo a Vincular *</label><select v-model="form.id_vehiculo" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer" required><option value="">Seleccione el vehículo...</option><option v-for="v in vehiculos" :key="v.id_vehiculo" :value="v.id_vehiculo">{{ v.placa }} - {{ v.marca }} {{ v.modelo }}</option></select></div><div class="border-2 border-dashed border-slate-700 hover:border-sky-500/50 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-900/30 relative"><input type="file" accept=".pdf" required class="absolute inset-0 opacity-0 cursor-pointer" @change="form.comprobante_pdf = $event.target.files[0]"><i class="fa-solid fa-file-pdf text-3xl text-slate-500 mb-2 transition-colors"></i><p class="text-xs font-medium text-slate-300">{{ form.comprobante_pdf?.name ? 'Archivo listo: ' + form.comprobante_pdf.name : 'Selecciona o arrastra el archivo legal (.pdf)' }}</p><p class="text-[10px] text-slate-500 mt-1">Tamaño máximo recomendado: 5MB</p></div><div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-400 mb-1">Cantidad Recibida *</label><input v-model="form.cantidad_recibida" type="number" min="1" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></div><div><label class="block text-xs font-semibold text-slate-400 mb-1">Costo Unitario ($) *</label><input v-model="form.costo_unitario" type="number" step="0.01" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></div></div></div>
-        <div class="px-6 py-4 bg-slate-900 border-t border-slate-800 flex justify-end gap-3"><button type="button" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 text-xs font-bold rounded-lg" @click="showModal = false">Cancelar</button><button class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg">Vincular al Stock</button></div>
+        <fieldset class="px-6 pb-6 space-y-3 text-sm text-slate-300">
+          <label class="flex items-center gap-2"><input v-model="conGarantia" type="checkbox"> Registrar garantía del repuesto</label>
+          <p v-if="!conGarantia" class="text-xs text-slate-400">Se registrará sin garantía.</p>
+          <template v-else>
+            <label class="block">Inicio de garantía<input v-model="form.garantia_inicio" type="date" required class="mt-1 block w-full rounded-lg bg-slate-900 p-2"></label>
+            <label class="block">Fecha de vencimiento<input v-model="form.garantia_fin" type="date" :min="form.garantia_inicio" required class="mt-1 block w-full rounded-lg bg-slate-900 p-2"></label>
+            <p class="text-xs text-slate-400">Confirma las fechas del proveedor. El vencimiento indica el primer día sin cobertura. Se avisará 30 días antes y al vencer.</p>
+          </template>
+          <p v-if="error" role="alert" class="text-rose-400">{{ error }}</p>
+        </fieldset>
+        <div class="px-6 py-4 bg-slate-900 border-t border-slate-800 flex justify-end gap-3"><button type="button" :disabled="uploading" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 text-xs font-bold rounded-lg" @click="showModal = false">Cancelar</button><button :disabled="uploading" class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg disabled:opacity-50">{{ uploading ? 'Guardando...' : 'Vincular al Stock' }}</button></div>
       </form>
     </div>
   </section>

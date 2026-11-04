@@ -419,6 +419,7 @@ onMounted(load)
 
               <td class="p-4 whitespace-nowrap font-mono text-xs font-bold text-sky-400">
                 {{ item.vehiculo?.placa || 'N/A' }}
+                <span v-if="item.vehiculo?.deleted_at" class="block text-amber-400 text-xs">Archivado</span>
               </td>
 
               <td class="p-4 whitespace-nowrap">
@@ -438,6 +439,7 @@ onMounted(load)
                   <i class="fa-solid fa-eye"></i>
                 </button>
                 <button
+                  v-if="!item.vehiculo?.deleted_at"
                   class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-blue-500/20 text-blue-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
                   title="Editar mantenimiento"
                   @click="edit(item)"
@@ -445,6 +447,7 @@ onMounted(load)
                   <i class="fa-solid fa-pen"></i>
                 </button>
                 <button
+                  v-if="!item.vehiculo?.deleted_at"
                   class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
                   title="Cancelar orden"
                   @click="cancel(item.id_mantenimiento)"

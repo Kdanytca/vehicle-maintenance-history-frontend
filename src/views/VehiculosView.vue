@@ -16,8 +16,7 @@ const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario:
 const placaValida = computed(() =>
   /^(RE|AB|MI|CC|CD|P|A|C|M|D|T|N|V)[0-9]{3}-[0-9]{3}$/i.test(form.placa.trim())
 )
-const deleteModal = reactive({ show: false, vehiculo: null, impacto: null, cancelarPendientes: false })
-const simpleDeleteModal = reactive({ show: false, vehiculo: null })
+const deleteModal = reactive({ show: false, vehiculo: null, impacto: null })
 let searchTimeout = null
 
 async function loadClientes() {
@@ -115,13 +114,13 @@ async function remove(vehiculo) {
   success.value = ''
 
   try {
-    await api.delete(`/vehiculos/${vehiculo.id_vehiculo}`, { params: { solo_validar: true } })
-    Object.assign(simpleDeleteModal, { show: true, vehiculo })
+    const { data } = await api.delete(`/vehiculos/${vehiculo.id_vehiculo}`, { params: { solo_validar: true } })
+    Object.assign(deleteModal, { show: true, vehiculo, impacto: data.impacto })
   } catch (exception) {
     const response = exception.response
 
     if (response?.status !== 409 || !response.data?.impacto) {
-      error.value = response?.data?.message || 'No se pudo eliminar el vehículo.'
+      error.value = response?.data?.message || 'No se pudo consultar el archivo del vehículo.'
       return
     }
 
@@ -129,36 +128,12 @@ async function remove(vehiculo) {
       show: true,
       vehiculo,
       impacto: response.data.impacto,
-      cancelarPendientes: response.data.impacto.mantenimientos_pendientes === 0,
     })
-  }
-}
-
-function closeSimpleDeleteModal() {
-  Object.assign(simpleDeleteModal, { show: false, vehiculo: null })
-}
-
-async function confirmSimpleDelete() {
-  if (!simpleDeleteModal.vehiculo) return
-
-  error.value = ''
-  success.value = ''
-
-  try {
-    const { data } = await api.delete(`/vehiculos/${simpleDeleteModal.vehiculo.id_vehiculo}`, {
-      params: { confirmar_eliminacion: true },
-    })
-
-    success.value = data.message || 'Vehículo eliminado correctamente.'
-    closeSimpleDeleteModal()
-    await load()
-  } catch (exception) {
-    error.value = exception.response?.data?.message || 'No se pudo eliminar el vehículo.'
   }
 }
 
 function closeDeleteModal() {
-  Object.assign(deleteModal, { show: false, vehiculo: null, impacto: null, cancelarPendientes: false })
+  Object.assign(deleteModal, { show: false, vehiculo: null, impacto: null })
 }
 
 async function confirmDelete() {
@@ -171,15 +146,15 @@ async function confirmDelete() {
     const { data } = await api.delete(`/vehiculos/${deleteModal.vehiculo.id_vehiculo}`, {
       params: {
         confirmar_eliminacion: true,
-        cancelar_pendientes: deleteModal.cancelarPendientes,
+        cancelar_pendientes: true,
       },
     })
 
-    success.value = data.message || 'Vehículo eliminado correctamente.'
+    success.value = data.message || 'Vehículo archivado correctamente.'
     closeDeleteModal()
     await load()
   } catch (exception) {
-    error.value = exception.response?.data?.message || 'No se pudo eliminar el vehículo.'
+    error.value = exception.response?.data?.message || 'No se pudo archivar el vehículo.'
   }
 }
 
@@ -294,7 +269,7 @@ watch(termino, () => {
               <td class="px-6 py-4 text-slate-300">{{ vehiculo.modelo }}</td>
               <td class="px-6 py-4 font-mono text-slate-400 text-xs">{{ vehiculo.anio }}</td>
               <td class="px-6 py-4"><div class="flex items-center gap-2"><i class="fa-solid fa-user text-xs text-slate-500"></i><span class="text-slate-300">{{ vehiculo.propietario?.nombre || 'Sin propietario' }}</span></div></td>
-              <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap"><RouterLink :to="`/vehiculos/${vehiculo.id_vehiculo}`" class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-sky-500/10 text-sky-400 rounded text-xs"><i class="fa-solid fa-eye"></i> Ver</RouterLink><button class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-blue-500/10 text-blue-400 rounded text-xs" @click="edit(vehiculo)"><i class="fa-solid fa-pen"></i> Editar</button><button class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-rose-500/10 text-rose-400 rounded text-xs" @click="remove(vehiculo)"><i class="fa-solid fa-trash-can"></i> Eliminar</button></td>
+              <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap"><RouterLink :to="`/vehiculos/${vehiculo.id_vehiculo}`" class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-sky-500/10 text-sky-400 rounded text-xs"><i class="fa-solid fa-eye"></i> Ver</RouterLink><button class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-blue-500/10 text-blue-400 rounded text-xs" @click="edit(vehiculo)"><i class="fa-solid fa-pen"></i> Editar</button><button class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-rose-500/10 text-rose-400 rounded text-xs" @click="remove(vehiculo)"><i class="fa-solid fa-box-archive"></i> Archivar</button></td>
             </tr>
             <tr v-if="vehiculos.length === 0"><td colspan="6" class="px-6 py-12 text-center text-slate-500"><i class="fa-solid fa-car-burst text-3xl mb-3 block text-slate-600"></i>No hay vehículos registrados en el sistema.</td></tr>
           </tbody>
@@ -306,14 +281,14 @@ watch(termino, () => {
       <div class="w-full max-w-lg rounded-xl border border-slate-800 bg-[#1e293b] shadow-2xl overflow-hidden">
         <div class="px-5 py-4 bg-slate-900/70 border-b border-slate-800 flex items-start justify-between gap-4">
           <div>
-            <p class="text-xs font-bold uppercase tracking-wider text-rose-400">Eliminar vehículo</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-rose-400">Archivar vehículo</p>
             <h3 class="text-lg font-bold text-white mt-1">{{ deleteModal.vehiculo?.placa }} - {{ deleteModal.vehiculo?.marca }} {{ deleteModal.vehiculo?.modelo }}</h3>
           </div>
           <button class="text-slate-500 hover:text-slate-200 transition" type="button" @click="closeDeleteModal"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         <div class="p-5 space-y-4">
-          <p class="text-sm text-slate-300">Esta acción eliminará el vehículo y los registros relacionados en cascada. Revisa el impacto antes de continuar.</p>
+          <p class="text-sm text-slate-300">El vehículo dejará de estar activo. Se conservarán todos sus mantenimientos, facturas, repuestos y costos en el historial y los reportes.</p>
 
           <div class="grid grid-cols-2 gap-3">
             <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendientes</span><strong class="text-amber-400 font-mono text-lg">{{ deleteModal.impacto?.mantenimientos_pendientes || 0 }}</strong></div>
@@ -322,36 +297,17 @@ watch(termino, () => {
             <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Repuestos</span><strong class="text-rose-400 font-mono text-lg">{{ deleteModal.impacto?.repuestos_total || 0 }}</strong></div>
           </div>
 
-          <label v-if="(deleteModal.impacto?.mantenimientos_pendientes || 0) > 0" class="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 cursor-pointer">
-            <input v-model="deleteModal.cancelarPendientes" type="checkbox" class="mt-1 accent-amber-500">
-            <span class="text-xs text-amber-200 leading-relaxed">Cancelar mantenimientos pendientes o en proceso antes de eliminar el vehículo.</span>
-          </label>
+          <p v-if="(deleteModal.impacto?.mantenimientos_pendientes || 0) > 0" class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200 leading-relaxed">Al confirmar, los trabajos pendientes o en proceso pasarán a Cancelado. Sus registros y costos se conservarán.</p>
 
-          <p class="text-xs text-slate-500">Esta acción no se puede deshacer.</p>
+          <p class="text-xs text-slate-500">Los gastos seguirán incluidos en los totales. No se podrán registrar nuevos servicios para este vehículo archivado.</p>
         </div>
 
         <div class="px-5 py-4 bg-slate-900/70 border-t border-slate-800 flex justify-end gap-3">
           <button type="button" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-semibold transition" @click="closeDeleteModal">Cancelar</button>
-          <button type="button" :disabled="(deleteModal.impacto?.mantenimientos_pendientes || 0) > 0 && !deleteModal.cancelarPendientes" class="px-4 py-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition" @click="confirmDelete">Eliminar definitivamente</button>
+          <button type="button" class="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-bold transition" @click="confirmDelete">Confirmar archivo</button>
         </div>
       </div>
     </div>
 
-    <div v-if="simpleDeleteModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-4">
-      <div class="w-full max-w-sm rounded-xl border border-slate-800 bg-[#1e293b] shadow-2xl overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-800 bg-slate-900/70">
-          <p class="text-xs font-bold uppercase tracking-wider text-rose-400">Confirmar eliminación</p>
-          <h3 class="text-base font-bold text-white mt-1">{{ simpleDeleteModal.vehiculo?.placa }}</h3>
-        </div>
-        <div class="p-5 space-y-3">
-          <p class="text-sm text-slate-300">Este vehículo no tiene registros vinculados. ¿Deseas eliminarlo?</p>
-          <p class="text-xs text-slate-500">Esta acción no se puede deshacer.</p>
-        </div>
-        <div class="px-5 py-4 bg-slate-900/70 border-t border-slate-800 flex justify-end gap-3">
-          <button type="button" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-semibold transition" @click="closeSimpleDeleteModal">Cancelar</button>
-          <button type="button" class="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-bold transition" @click="confirmSimpleDelete">Eliminar</button>
-        </div>
-      </div>
-    </div>
   </section>
 </template>

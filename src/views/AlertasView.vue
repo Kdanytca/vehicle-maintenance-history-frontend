@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import api from '../api'
+import AlertasGarantia from '../components/AlertasGarantia.vue'
 
 const alertas = ref([])
 const error = ref('')
@@ -30,6 +31,7 @@ onMounted(load)
 
 <template>
   <section>
+    <AlertasGarantia />
     <div class="mb-6"><h1 class="text-2xl font-bold text-white tracking-tight">Módulo de Alertas Operativas</h1><p class="text-sm text-slate-400">Gestión de comunicaciones, despacho manual y trazabilidad de notificaciones.</p></div>
     <p v-if="success" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl text-sm mb-4">{{ success }}</p>
     <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-sm mb-4">{{ error }}</p>
