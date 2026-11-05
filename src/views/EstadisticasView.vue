@@ -1,4 +1,3 @@
-
 <script setup>
 import { onMounted, ref } from 'vue'
 import api from '../api'
@@ -33,12 +32,8 @@ onMounted(cargarEstadisticas)
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <p class="text-sm text-sky-400 font-medium">Panel de análisis</p>
-        <h1 class="text-2xl sm:text-3xl font-bold text-white mt-1">
-          Estadísticas de mantenimiento
-        </h1>
-        <p class="text-slate-400 mt-2">
-          Resumen de los mantenimientos registrados y los vehículos con más servicios.
-        </p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-white mt-1">Estadísticas de mantenimiento</h1>
+        <p class="text-slate-400 mt-2">Resumen de los mantenimientos registrados y los vehículos con más servicios.</p>
       </div>
 
       <button
@@ -52,25 +47,12 @@ onMounted(cargarEstadisticas)
       </button>
     </header>
 
-    <div
-      v-if="error"
-      class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-300"
-      role="alert"
-    >
+    <div v-if="error" class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-300" role="alert">
       {{ error }}
-      <button
-        type="button"
-        class="ml-2 underline"
-        @click="cargarEstadisticas"
-      >
-        Reintentar
-      </button>
+      <button type="button" class="ml-2 underline" @click="cargarEstadisticas">Reintentar</button>
     </div>
 
-    <div
-      v-if="cargando"
-      class="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-400"
-    >
+    <div v-if="cargando" class="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-400">
       Cargando estadísticas...
     </div>
 
@@ -83,9 +65,7 @@ onMounted(cargarEstadisticas)
               <p class="text-4xl font-bold text-white mt-3">
                 {{ totalMantenimientos }}
               </p>
-              <p class="text-sm text-slate-500 mt-2">
-                Registros en el sistema
-              </p>
+              <p class="text-sm text-slate-500 mt-2">Registros en el sistema</p>
             </div>
             <div class="w-14 h-14 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center">
               <i class="fa-solid fa-wrench text-2xl"></i>
@@ -100,9 +80,7 @@ onMounted(cargarEstadisticas)
               <p class="text-4xl font-bold text-white mt-3">
                 {{ vehiculosConMasServicios.length }}
               </p>
-              <p class="text-sm text-slate-500 mt-2">
-                En el listado de los cinco primeros
-              </p>
+              <p class="text-sm text-slate-500 mt-2">En el listado de los cinco primeros</p>
             </div>
             <div class="w-14 h-14 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center">
               <i class="fa-solid fa-car text-2xl"></i>
@@ -113,9 +91,7 @@ onMounted(cargarEstadisticas)
 
       <section class="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
         <div class="p-5 sm:p-6 border-b border-slate-800">
-          <h2 class="text-lg font-semibold text-white">
-            Vehículos con más servicios
-          </h2>
+          <h2 class="text-lg font-semibold text-white">Vehículos con más servicios</h2>
           <p class="text-sm text-slate-400 mt-1">
             Los cinco vehículos con mayor cantidad de mantenimientos registrados.
           </p>
@@ -134,6 +110,7 @@ onMounted(cargarEstadisticas)
                 <th class="px-5 py-4">Marca</th>
                 <th class="px-5 py-4">Modelo</th>
                 <th class="px-5 py-4 text-right">Total de servicios</th>
+                <th class="px-5 py-4 text-right">Total servicio*10</th>
               </tr>
             </thead>
 
@@ -150,8 +127,17 @@ onMounted(cargarEstadisticas)
                 <td class="px-5 py-4 text-slate-200">{{ vehiculo.marca }}</td>
                 <td class="px-5 py-4 text-slate-200">{{ vehiculo.modelo }}</td>
                 <td class="px-5 py-4 text-right">
-                  <span class="inline-flex min-w-10 justify-center rounded-full bg-sky-500/10 px-3 py-1 font-semibold text-sky-300">
+                  <span
+                    class="inline-flex min-w-10 justify-center rounded-full bg-sky-500/10 px-3 py-1 font-semibold text-sky-300"
+                  >
                     {{ vehiculo.total_servicios }}
+                  </span>
+                </td>
+                <td class="px-5 py-4 text-right">
+                  <span
+                    class="inline-flex min-w-10 justify-center rounded-full bg-amber-500/10 px-3 py-1 font-semibold text-amber-300"
+                  >
+                    {{ vehiculo.total_servicios_x_10 }}
                   </span>
                 </td>
               </tr>

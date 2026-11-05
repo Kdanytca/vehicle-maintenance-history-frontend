@@ -16,13 +16,14 @@ const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario:
 const placaValida = computed(() =>
   /^(RE|AB|MI|CC|CD|P|A|C|M|D|T|N|V)[0-9]{3}-[0-9]{3}$/i.test(form.placa.trim())
 )
+const modeloValido = computed(() => form.modelo.trim().length <= 6)
 const deleteModal = reactive({ show: false, vehiculo: null, impacto: null })
 let searchTimeout = null
 
 async function loadClientes() {
   try {
     const { data } = await api.get('/clientes')
-    clientes.value = Array.isArray(data) ? data : (data?.clientes || data?.data || [])
+    clientes.value = Array.isArray(data) ? data : data?.clientes || data?.data || []
   } catch {
     const cached = localStorage.getItem('tallersga_clientes_cache')
     clientes.value = cached ? JSON.parse(cached) : []
@@ -31,7 +32,7 @@ async function loadClientes() {
 
 async function load() {
   const { data } = await api.get('/vehiculos')
-  vehiculos.value = Array.isArray(data) ? data : (data?.vehiculos || data?.data || [])
+  vehiculos.value = Array.isArray(data) ? data : data?.vehiculos || data?.data || []
   await loadClientes()
 }
 
@@ -39,6 +40,11 @@ function resetForm() {
   Object.assign(form, { placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
   editingId.value = null
   showForm.value = false
+}
+
+function abrirNuevoVehiculo() {
+  editingId.value = null
+  showForm.value = true
 }
 
 function onClienteSelect() {
@@ -52,10 +58,15 @@ function onClienteSelect() {
 function edit(vehiculo) {
   const matchingCliente = clientes.value.find((c) => {
     const cId = c.id_cliente || c.id
-    const vCId = vehiculo.id_cliente || vehiculo.cliente_id || vehiculo.propietario?.id_cliente || vehiculo.propietario?.id
+    const vCId =
+      vehiculo.id_cliente || vehiculo.cliente_id || vehiculo.propietario?.id_cliente || vehiculo.propietario?.id
     if (vCId && cId && String(vCId) === String(cId)) return true
     const cNombre = `${c.nombre || ''} ${c.apellido || ''}`.trim().toLowerCase()
-    const vNombre = (vehiculo.propietario?.nombre || (typeof vehiculo.propietario === 'string' ? vehiculo.propietario : '')).trim().toLowerCase()
+    const vNombre = (
+      vehiculo.propietario?.nombre || (typeof vehiculo.propietario === 'string' ? vehiculo.propietario : '')
+    )
+      .trim()
+      .toLowerCase()
     return cNombre && vNombre && cNombre === vNombre
   })
 
@@ -64,7 +75,7 @@ function edit(vehiculo) {
     marca: vehiculo.marca,
     modelo: vehiculo.modelo,
     anio: vehiculo.anio,
-    id_cliente: matchingCliente ? (matchingCliente.id_cliente || matchingCliente.id) : (vehiculo.id_cliente || ''),
+    id_cliente: matchingCliente ? matchingCliente.id_cliente || matchingCliente.id : vehiculo.id_cliente || '',
     propietario: vehiculo.propietario?.nombre || (typeof vehiculo.propietario === 'string' ? vehiculo.propietario : ''),
   })
   editingId.value = vehiculo.id_vehiculo
@@ -88,6 +99,11 @@ async function save() {
     return
   }
 
+  if (!modeloValido.value) {
+    error.value = 'El modelo no puede superar los 6 caracteres.'
+    return
+  }
+
   // Normaliza la placa antes de enviarla a la API.
   form.placa = form.placa.trim().toUpperCase()
 
@@ -104,6 +120,7 @@ async function save() {
   } catch (exception) {
     error.value =
       exception.response?.data?.errors?.placa?.[0] ||
+      exception.response?.data?.errors?.modelo?.[0] ||
       exception.response?.data?.message ||
       'No se pudo guardar el vehículo'
   }
@@ -172,18 +189,41 @@ watch(termino, () => {
       <div>
         <p class="text-slate-400 text-sm">Listado de todos los vehículos registrados en el taller.</p>
       </div>
-      <button class="bg-sky-500 hover:bg-sky-600 transition text-slate-900 px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-lg shadow-sky-500/10" @click="showForm = true; editingId = null">
+      <button
+        class="bg-sky-500 hover:bg-sky-600 transition text-slate-900 px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-lg shadow-sky-500/10"
+        @click="abrirNuevoVehiculo"
+      >
         <i class="fa-solid fa-plus text-xs"></i> Nuevo Vehículo
       </button>
     </div>
 
-    <form class="bg-[#1e293b] rounded-xl border border-slate-800 shadow-xl p-4 mb-6 flex flex-col sm:flex-row gap-3" @submit.prevent>
-      <input v-model="termino" placeholder="Buscar por placa o propietario" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition" />
-      <button type="button" class="bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-semibold text-sm" @click="termino = ''">Limpiar</button>
+    <form
+      class="bg-[#1e293b] rounded-xl border border-slate-800 shadow-xl p-4 mb-6 flex flex-col sm:flex-row gap-3"
+      @submit.prevent
+    >
+      <input
+        v-model="termino"
+        placeholder="Buscar por placa o propietario"
+        class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition"
+      />
+      <button
+        type="button"
+        class="bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-semibold text-sm"
+        @click="termino = ''"
+      >
+        Limpiar
+      </button>
     </form>
 
-    <form v-if="showForm" class="bg-[#1e293b] rounded-xl border border-slate-800 shadow-xl overflow-hidden p-6 space-y-6 mb-6" @submit.prevent="save">
-      <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-car bg-sky-500/10 text-sky-400 p-2 rounded-lg text-sm"></i> {{ editingId ? 'Editar Vehículo' : 'Registrar Nuevo Vehículo' }}</h2>
+    <form
+      v-if="showForm"
+      class="bg-[#1e293b] rounded-xl border border-slate-800 shadow-xl overflow-hidden p-6 space-y-6 mb-6"
+      @submit.prevent="save"
+    >
+      <h2 class="text-xl font-bold text-white flex items-center gap-2">
+        <i class="fa-solid fa-car bg-sky-500/10 text-sky-400 p-2 rounded-lg text-sm"></i>
+        {{ editingId ? 'Editar Vehículo' : 'Registrar Nuevo Vehículo' }}
+      </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Placa</label>
@@ -198,17 +238,50 @@ watch(termino, () => {
           <p v-if="form.placa && !placaValida" class="mt-2 text-xs text-rose-400">
             Formato inválido. Ejemplo esperado: P123-456.
           </p>
-          <p v-else-if="placaValida" class="mt-2 text-xs text-emerald-400">
-            Formato de placa válido.
+          <p v-else-if="placaValida" class="mt-2 text-xs text-emerald-400">Formato de placa válido.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Marca</label
+          ><input
+            v-model="form.marca"
+            required
+            placeholder="Ej: Toyota"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Modelo</label>
+          <input
+            v-model="form.modelo"
+            required
+            maxlength="6"
+            placeholder="Ej: CivicX"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition"
+          />
+          <p v-if="form.modelo && !modeloValido" class="mt-2 text-xs text-rose-400">
+            El modelo no puede superar los 6 caracteres.
           </p>
         </div>
-        <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Marca</label><input v-model="form.marca" required placeholder="Ej: Toyota" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
-        <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Modelo</label><input v-model="form.modelo" required placeholder="Ej: Corolla" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition" /></div>
-        <div><label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Año</label><input v-model="form.anio" required type="number" min="1900" :max="new Date().getFullYear() + 1" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition" /></div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Año</label
+          ><input
+            v-model="form.anio"
+            required
+            type="number"
+            min="1900"
+            :max="new Date().getFullYear() + 1"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition"
+          />
+        </div>
         <div class="md:col-span-2 space-y-2">
           <div class="flex items-center justify-between">
-            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Cliente / Propietario</label>
-            <RouterLink to="/clientes" class="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 font-medium">
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider"
+              >Cliente / Propietario</label
+            >
+            <RouterLink
+              to="/clientes"
+              class="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 font-medium"
+            >
               <i class="fa-solid fa-users text-[10px]"></i> Administrar Clientes
             </RouterLink>
           </div>
@@ -221,11 +294,7 @@ watch(termino, () => {
                 @change="onClienteSelect"
               >
                 <option value="">-- Seleccionar cliente existente --</option>
-                <option
-                  v-for="c in clientes"
-                  :key="c.id_cliente || c.id"
-                  :value="c.id_cliente || c.id"
-                >
+                <option v-for="c in clientes" :key="c.id_cliente || c.id" :value="c.id_cliente || c.id">
                   {{ c.nombre }} {{ c.apellido || '' }} {{ c.dui ? `(${c.dui})` : '' }}
                 </option>
               </select>
@@ -240,12 +309,22 @@ watch(termino, () => {
               />
             </div>
           </div>
-          <p class="text-[11px] text-slate-500">Puedes seleccionar un cliente registrado del sistema o ingresar su nombre directamente.</p>
+          <p class="text-[11px] text-slate-500">
+            Puedes seleccionar un cliente registrado del sistema o ingresar su nombre directamente.
+          </p>
         </div>
       </div>
-      <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-lg text-sm">{{ error }}</p>
+      <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-lg text-sm">
+        {{ error }}
+      </p>
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/60">
-        <button type="button" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 rounded-lg text-sm font-bold transition" @click="resetForm">Cancelar</button>
+        <button
+          type="button"
+          class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 rounded-lg text-sm font-bold transition"
+          @click="resetForm"
+        >
+          Cancelar
+        </button>
         <button
           :disabled="!placaValida"
           class="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-sky-500/10"
@@ -256,55 +335,149 @@ watch(termino, () => {
       </div>
     </form>
 
-    <p v-if="success" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-lg text-sm mb-6">{{ success }}</p>
+    <p
+      v-if="success"
+      class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-lg text-sm mb-6"
+    >
+      {{ success }}
+    </p>
 
     <div class="bg-[#1e293b] rounded-xl border border-slate-800 overflow-hidden shadow-xl">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead><tr class="bg-slate-900/50 border-b border-slate-800"><th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Placa</th><th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Marca</th><th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Modelo</th><th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Año</th><th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Propietario</th><th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider text-right">Acciones</th></tr></thead>
+          <thead>
+            <tr class="bg-slate-900/50 border-b border-slate-800">
+              <th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Placa</th>
+              <th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Marca</th>
+              <th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Modelo</th>
+              <th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Año</th>
+              <th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">Propietario</th>
+              <th class="px-6 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider text-right">
+                Acciones
+              </th>
+            </tr>
+          </thead>
           <tbody class="divide-y divide-slate-800/60">
-            <tr v-for="vehiculo in vehiculos" :key="vehiculo.id_vehiculo" class="hover:bg-slate-800/30 transition-colors">
-              <td class="px-6 py-4"><span class="bg-slate-900 text-sky-400 font-mono text-xs px-2.5 py-1 rounded border border-slate-800">{{ vehiculo.placa }}</span></td>
+            <tr
+              v-for="vehiculo in vehiculos"
+              :key="vehiculo.id_vehiculo"
+              class="hover:bg-slate-800/30 transition-colors"
+            >
+              <td class="px-6 py-4">
+                <span class="bg-slate-900 text-sky-400 font-mono text-xs px-2.5 py-1 rounded border border-slate-800">{{
+                  vehiculo.placa
+                }}</span>
+              </td>
               <td class="px-6 py-4 font-medium text-white">{{ vehiculo.marca }}</td>
               <td class="px-6 py-4 text-slate-300">{{ vehiculo.modelo }}</td>
               <td class="px-6 py-4 font-mono text-slate-400 text-xs">{{ vehiculo.anio }}</td>
-              <td class="px-6 py-4"><div class="flex items-center gap-2"><i class="fa-solid fa-user text-xs text-slate-500"></i><span class="text-slate-300">{{ vehiculo.propietario?.nombre || 'Sin propietario' }}</span></div></td>
-              <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap"><RouterLink :to="`/vehiculos/${vehiculo.id_vehiculo}`" class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-sky-500/10 text-sky-400 rounded text-xs"><i class="fa-solid fa-eye"></i> Ver</RouterLink><button class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-blue-500/10 text-blue-400 rounded text-xs" @click="edit(vehiculo)"><i class="fa-solid fa-pen"></i> Editar</button><button class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-rose-500/10 text-rose-400 rounded text-xs" @click="remove(vehiculo)"><i class="fa-solid fa-box-archive"></i> Archivar</button></td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-user text-xs text-slate-500"></i>
+                  <span class="text-slate-300">{{ vehiculo.propietario?.nombre || 'Sin propietario' }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                <RouterLink
+                  :to="`/vehiculos/${vehiculo.id_vehiculo}`"
+                  class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-sky-500/10 text-sky-400 rounded text-xs"
+                  ><i class="fa-solid fa-eye"></i> Ver</RouterLink
+                ><button
+                  class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-blue-500/10 text-blue-400 rounded text-xs"
+                  @click="edit(vehiculo)"
+                >
+                  <i class="fa-solid fa-pen"></i> Editar</button
+                ><button
+                  class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-rose-500/10 text-rose-400 rounded text-xs"
+                  @click="remove(vehiculo)"
+                >
+                  <i class="fa-solid fa-box-archive"></i> Archivar
+                </button>
+              </td>
             </tr>
-            <tr v-if="vehiculos.length === 0"><td colspan="6" class="px-6 py-12 text-center text-slate-500"><i class="fa-solid fa-car-burst text-3xl mb-3 block text-slate-600"></i>No hay vehículos registrados en el sistema.</td></tr>
+            <tr v-if="vehiculos.length === 0">
+              <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                <i class="fa-solid fa-car-burst text-3xl mb-3 block text-slate-600"></i>No hay vehículos registrados en
+                el sistema.
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div v-if="deleteModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-4">
+    <div
+      v-if="deleteModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-4"
+    >
       <div class="w-full max-w-lg rounded-xl border border-slate-800 bg-[#1e293b] shadow-2xl overflow-hidden">
         <div class="px-5 py-4 bg-slate-900/70 border-b border-slate-800 flex items-start justify-between gap-4">
           <div>
             <p class="text-xs font-bold uppercase tracking-wider text-rose-400">Archivar vehículo</p>
-            <h3 class="text-lg font-bold text-white mt-1">{{ deleteModal.vehiculo?.placa }} - {{ deleteModal.vehiculo?.marca }} {{ deleteModal.vehiculo?.modelo }}</h3>
+            <h3 class="text-lg font-bold text-white mt-1">
+              {{ deleteModal.vehiculo?.placa }} - {{ deleteModal.vehiculo?.marca }} {{ deleteModal.vehiculo?.modelo }}
+            </h3>
           </div>
-          <button class="text-slate-500 hover:text-slate-200 transition" type="button" @click="closeDeleteModal"><i class="fa-solid fa-xmark"></i></button>
+          <button class="text-slate-500 hover:text-slate-200 transition" type="button" @click="closeDeleteModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
         </div>
 
         <div class="p-5 space-y-4">
-          <p class="text-sm text-slate-300">El vehículo dejará de estar activo. Se conservarán todos sus mantenimientos, facturas, repuestos y costos en el historial y los reportes.</p>
+          <p class="text-sm text-slate-300">
+            El vehículo dejará de estar activo. Se conservarán todos sus mantenimientos, facturas, repuestos y costos
+            en el historial y los reportes.
+          </p>
 
           <div class="grid grid-cols-2 gap-3">
-            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendientes</span><strong class="text-amber-400 font-mono text-lg">{{ deleteModal.impacto?.mantenimientos_pendientes || 0 }}</strong></div>
-            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Mantenimientos</span><strong class="text-sky-400 font-mono text-lg">{{ deleteModal.impacto?.mantenimientos_total || 0 }}</strong></div>
-            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Facturas</span><strong class="text-violet-400 font-mono text-lg">{{ deleteModal.impacto?.facturas_total || 0 }}</strong></div>
-            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Repuestos</span><strong class="text-rose-400 font-mono text-lg">{{ deleteModal.impacto?.repuestos_total || 0 }}</strong></div>
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
+              <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Pendientes</span
+              ><strong class="text-amber-400 font-mono text-lg">{{
+                deleteModal.impacto?.mantenimientos_pendientes || 0
+              }}</strong>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
+              <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Mantenimientos</span
+              ><strong class="text-sky-400 font-mono text-lg">{{
+                deleteModal.impacto?.mantenimientos_total || 0
+              }}</strong>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
+              <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Facturas</span
+              ><strong class="text-violet-400 font-mono text-lg">{{ deleteModal.impacto?.facturas_total || 0 }}</strong>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
+              <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-bold">Repuestos</span
+              ><strong class="text-rose-400 font-mono text-lg">{{ deleteModal.impacto?.repuestos_total || 0 }}</strong>
+            </div>
           </div>
 
-          <p v-if="(deleteModal.impacto?.mantenimientos_pendientes || 0) > 0" class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200 leading-relaxed">Al confirmar, los trabajos pendientes o en proceso pasarán a Cancelado. Sus registros y costos se conservarán.</p>
+          <p
+            v-if="(deleteModal.impacto?.mantenimientos_pendientes || 0) > 0"
+            class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200 leading-relaxed"
+          >
+            Al confirmar, los trabajos pendientes o en proceso pasarán a Cancelado. Sus registros y costos se
+            conservarán.
+          </p>
 
           <p class="text-xs text-slate-500">Los gastos seguirán incluidos en los totales. No se podrán registrar nuevos servicios para este vehículo archivado.</p>
         </div>
 
         <div class="px-5 py-4 bg-slate-900/70 border-t border-slate-800 flex justify-end gap-3">
-          <button type="button" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-semibold transition" @click="closeDeleteModal">Cancelar</button>
-          <button type="button" class="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-bold transition" @click="confirmDelete">Confirmar archivo</button>
+          <button
+            type="button"
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-semibold transition"
+            @click="closeDeleteModal"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-bold transition"
+            @click="confirmDelete"
+          >
+            Confirmar archivo
+          </button>
         </div>
       </div>
     </div>
