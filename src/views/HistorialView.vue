@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import api from '../api'
 import { exportarExcel, exportarPDF } from '../utils/exportarHistorial'
+import { facturaPdfUrl } from '../utils/facturas'
 
 const vehiculos = ref([])
 const selected = ref('')
@@ -149,9 +150,17 @@ onMounted(load)
               <div>
                 <span class="block text-xs text-slate-500 uppercase font-bold mb-2">Repuestos utilizados</span>
                 <table v-if="item.repuestos?.length" class="w-full text-left text-xs">
-                  <thead><tr class="text-slate-500 border-b border-slate-800"><th class="py-2">Pieza</th><th class="py-2">Código</th><th class="py-2 text-right">Costo</th></tr></thead>
+                  <thead><tr class="text-slate-500 border-b border-slate-800"><th class="py-2">Pieza</th><th class="py-2">Código</th><th class="py-2">Factura</th><th class="py-2 text-right">Costo</th></tr></thead>
                   <tbody class="divide-y divide-slate-800/60 text-slate-300">
-                    <tr v-for="repuesto in item.repuestos" :key="repuesto.id_repuesto"><td class="py-2">{{ repuesto.nombre_pieza }}</td><td class="py-2 font-mono text-slate-500">{{ repuesto.codigo_pieza || '—' }}</td><td class="py-2 text-right font-mono">{{ dinero(repuesto.costo_unitario) }}</td></tr>
+                    <tr v-for="repuesto in item.repuestos" :key="repuesto.id_repuesto">
+                      <td class="py-2">{{ repuesto.nombre_pieza }}</td>
+                      <td class="py-2 font-mono text-slate-500">{{ repuesto.codigo_pieza || '—' }}</td>
+                      <td class="py-2">
+                        <a v-if="facturaPdfUrl(repuesto.factura?.ruta_pdf_almacenamiento)" :href="facturaPdfUrl(repuesto.factura.ruta_pdf_almacenamiento)" target="_blank" rel="noopener" class="text-sky-400 hover:underline" :title="`Ver factura ${repuesto.factura.numero_factura} (PDF)`"><i class="fa-solid fa-file-pdf mr-1"></i>{{ repuesto.factura.numero_factura }}</a>
+                        <span v-else class="text-slate-600">Sin factura</span>
+                      </td>
+                      <td class="py-2 text-right font-mono">{{ dinero(repuesto.costo_unitario) }}</td>
+                    </tr>
                   </tbody>
                 </table>
                 <p v-else class="text-xs text-slate-600">No se registraron repuestos en este servicio.</p>

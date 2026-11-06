@@ -51,7 +51,7 @@ function armarDatos(detail) {
       dinero(m.costo_total),
     ]),
     repuestos: mantenimientos.flatMap((m, i) =>
-      (m.repuestos || []).map((r) => [i + 1, m.fecha_servicio, r.nombre_pieza, r.codigo_pieza || '', dinero(r.costo_unitario)]),
+      (m.repuestos || []).map((r) => [i + 1, m.fecha_servicio, r.nombre_pieza, r.codigo_pieza || '', r.factura?.numero_factura || '', dinero(r.costo_unitario)]),
     ),
     auditoria: historial.map((e) => [
       fechaHora(e.created_at),
@@ -65,7 +65,7 @@ function armarDatos(detail) {
 
 const COLUMNAS = {
   mantenimientos: ['#', 'Fecha', 'Descripción', 'Estado', 'Mecánico', 'Mano de obra', 'Repuestos', 'Total'],
-  repuestos: ['Mant. #', 'Fecha', 'Pieza', 'Código', 'Costo unitario'],
+  repuestos: ['Mant. #', 'Fecha', 'Pieza', 'Código', 'Factura', 'Costo unitario'],
   auditoria: ['Fecha', 'Tipo', 'Descripción', 'Usuario', 'IP'],
 }
 
@@ -154,7 +154,7 @@ export async function crearExcel(detail) {
   general.getRow(datos.vehiculo.length + 5).font = { bold: true }
 
   hoja('Mantenimientos', COLUMNAS.mantenimientos, datos.mantenimientos, [5, 12, 45, 14, 16, 14, 12, 12])
-  hoja('Repuestos', COLUMNAS.repuestos, datos.repuestos, [9, 12, 35, 18, 15])
+  hoja('Repuestos', COLUMNAS.repuestos, datos.repuestos, [9, 12, 35, 18, 20, 15])
   hoja('Auditoría', COLUMNAS.auditoria, datos.auditoria, [18, 20, 60, 15, 15])
 
   return libro

@@ -1,65 +1,74 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
+import { facturaPdfUrl as pdfUrl, validarFacturaPdf } from '../utils/facturas'
 
 const repuestos = ref([])
 const vehiculos = ref([])
+const mantenimientos = ref([])
 const showModal = ref(false)
 const error = ref('')
 const success = ref('')
 const conGarantia = ref(false)
 const uploading = ref(false)
-const form = reactive({
-  id_vehiculo: '',
-  comprobante_pdf: null,
-  numero_factura: '',
-  cantidad_recibida: 1,
-  costo_unitario: 0,
-  garantia_inicio: '',
-  garantia_fin: '',
-})
+const fileInput = ref(null)
+const emptyForm = () => ({ id_vehiculo: '', id_mantenimiento: '', numero_factura: '', nombre_pieza: '', codigo_pieza: '', comprobante_pdf: null, cantidad_recibida: 1, costo_unitario: 0, garantia_inicio: '', garantia_fin: '' })
+const form = reactive(emptyForm())
 
-function pdfUrl(path) {
-  if (!path) return '#'
-  const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').replace('/api', '')
-  return `${base}/storage/${path}`
-}
+const mantenimientosDelVehiculo = computed(() => mantenimientos.value.filter((m) => String(m.id_vehiculo) === String(form.id_vehiculo)))
 
 async function load() {
   const { data } = await api.get('/repuestos')
   repuestos.value = data.repuestos
   vehiculos.value = data.vehiculos
+  mantenimientos.value = data.mantenimientos || []
+}
+
+function openModal() {
+  error.value = ''
+  success.value = ''
+  showModal.value = true
+}
+
+function onVehiculoChange() {
+  form.id_mantenimiento = ''
+}
+
+function onFileChange(event) {
+  const file = event.target.files?.[0] || null
+  const message = validarFacturaPdf(file)
+  if (file && message) {
+    error.value = message
+    form.comprobante_pdf = null
+    event.target.value = ''
+    return
+  }
+  error.value = ''
+  form.comprobante_pdf = file
 }
 
 async function upload() {
   if (uploading.value) return
-  uploading.value = true
-  error.value = ''
+  error.value = validarFacturaPdf(form.comprobante_pdf)
   success.value = ''
+  if (error.value) return
+  uploading.value = true
 
   try {
     const payload = new FormData()
     Object.entries(form).forEach(([key, value]) => {
       if (!key.startsWith('garantia_') || conGarantia.value) payload.append(key, value)
     })
-    const { data } = await api.post('/repuestos/cargar-pdf', payload, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    Object.assign(form, {
-      id_vehiculo: '',
-      comprobante_pdf: null,
-      numero_factura: '',
-      cantidad_recibida: 1,
-      costo_unitario: 0,
-      garantia_inicio: '',
-      garantia_fin: '',
-    })
+    const { data } = await api.post('/repuestos/cargar-pdf', payload, { headers: { 'Content-Type': 'multipart/form-data' } })
+    Object.assign(form, emptyForm())
+    if (fileInput.value) fileInput.value.value = ''
     conGarantia.value = false
-    success.value = data.message || 'Factura procesada correctamente.'
+    success.value = data.message || 'Factura cargada correctamente.'
     showModal.value = false
     await load()
   } catch (exception) {
-    error.value = exception.response?.data?.message || 'No se pudo procesar la factura.'
+    const errors = exception.response?.data?.errors
+    error.value = (errors && Object.values(errors).flat()[0]) || exception.response?.data?.message || 'No se pudo procesar la factura.'
   } finally {
     uploading.value = false
   }
@@ -71,181 +80,57 @@ onMounted(load)
 <template>
   <section class="space-y-6">
     <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-white tracking-tight">Inventario de Repuestos y Reposición</h1>
-        <p class="text-sm text-slate-400">Registro de Repuestos a través de facturas de compra.</p>
-      </div>
-      <button
-        class="bg-sky-500 hover:bg-sky-600 transition-all text-slate-900 px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-md"
-        @click="showModal = true"
-      >
-        <i class="fa-solid fa-file-arrow-up text-xs"></i> Cargar Factura de Compra
-      </button>
+      <div><h1 class="text-2xl font-bold text-white tracking-tight">Inventario de Repuestos y Reposición</h1><p class="text-sm text-slate-400">Registro de Repuestos a través de facturas de compra.</p></div>
+      <button class="bg-sky-500 hover:bg-sky-600 transition-all text-slate-900 px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-md" @click="openModal"><i class="fa-solid fa-file-arrow-up text-xs"></i> Cargar Factura de Compra</button>
     </div>
-    <p v-if="success" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl text-sm">
-      {{ success }}
-    </p>
-    <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-sm">
-      {{ error }}
-    </p>
+    <p v-if="success" role="status" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl text-sm">{{ success }}</p>
+    <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-sm">{{ error }}</p>
 
     <div class="bg-[#1e293b] rounded-xl border border-slate-800 overflow-hidden shadow-sm">
-      <table class="w-full text-left text-sm border-collapse">
-        <thead>
-          <tr
-            class="bg-slate-900/50 border-b border-slate-800 text-slate-400 text-xs font-semibold uppercase tracking-wider"
-          >
-            <th class="p-4">Código Pieza</th>
-            <th class="p-4">Nombre / Descripción</th>
-            <th class="p-4">Precio Unitario de Costo</th>
-            <th class="p-4">Factura Asociada (PDF)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-800/60 text-slate-300">
-          <tr v-if="repuestos.length === 0">
-            <td colspan="4" class="p-8 text-center text-slate-500 text-xs uppercase tracking-wider">
-              No hay repuestos registrados en la base de datos.
-            </td>
-          </tr>
-          <tr v-for="repuesto in repuestos" :key="repuesto.id_repuesto" class="hover:bg-slate-800/30 transition-colors">
-            <td class="p-4 font-mono font-medium text-slate-400">{{ repuesto.codigo_pieza || 'S/N' }}</td>
-            <td class="p-4 text-white font-medium">{{ repuesto.nombre_pieza }}</td>
-            <td class="p-4 font-mono">${{ Number(repuesto.costo_unitario || 0).toFixed(2) }}</td>
-            <td class="p-4">
-              <a
-                v-if="repuesto.factura"
-                :href="pdfUrl(repuesto.factura.ruta_pdf_almacenamiento)"
-                target="_blank"
-                class="text-sky-400 hover:underline"
-                ><i class="fa-solid fa-paperclip mr-1 text-xs"></i>{{ repuesto.factura.numero_factura }}.pdf</a
-              ><span v-else class="text-slate-500">Sin documento</span>
-            </td>
-          </tr>
-        </tbody>
+      <table class="w-full text-left text-sm border-collapse"><thead><tr class="bg-slate-900/50 border-b border-slate-800 text-slate-400 text-xs font-semibold uppercase tracking-wider"><th class="p-4">Código Pieza</th><th class="p-4">Nombre / Descripción</th><th class="p-4">Precio Unitario de Costo</th><th class="p-4">Factura Asociada (PDF)</th></tr></thead>
+        <tbody class="divide-y divide-slate-800/60 text-slate-300"><tr v-if="repuestos.length === 0"><td colspan="4" class="p-8 text-center text-slate-500 text-xs uppercase tracking-wider">No hay repuestos registrados en la base de datos.</td></tr><tr v-for="repuesto in repuestos" :key="repuesto.id_repuesto" class="hover:bg-slate-800/30 transition-colors"><td class="p-4 font-mono font-medium text-slate-400">{{ repuesto.codigo_pieza || 'S/N' }}</td><td class="p-4 text-white font-medium">{{ repuesto.nombre_pieza }}</td><td class="p-4 font-mono">${{ Number(repuesto.costo_unitario || 0).toFixed(2) }}</td><td class="p-4"><a v-if="repuesto.factura" :href="pdfUrl(repuesto.factura.ruta_pdf_almacenamiento)" target="_blank" class="text-sky-400 hover:underline"><i class="fa-solid fa-paperclip mr-1 text-xs"></i>{{ repuesto.factura.numero_factura }}.pdf</a><span v-else class="text-slate-500">Sin documento</span></td></tr></tbody>
       </table>
     </div>
 
-    <div
-      v-if="showModal"
-      class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity duration-300"
-    >
-      <form
-        class="bg-[#1e293b] border border-slate-800 w-full max-w-md rounded-xl overflow-y-auto max-h-[90vh] shadow-2xl"
-        @submit.prevent="upload"
-      >
-        <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-          <h3 class="font-bold text-white text-base">Cargar Repuestos vía Factura PDF</h3>
-          <button type="button" class="text-slate-400 hover:text-white text-sm" @click="showModal = false">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-        <div class="p-6 space-y-4">
+    <div v-if="showModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity duration-300">
+      <form class="bg-[#1e293b] border border-slate-800 w-full max-w-md rounded-xl overflow-y-auto max-h-[90vh] shadow-2xl" @submit.prevent="upload">
+        <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-white text-base">Cargar Repuesto vía Factura PDF</h3><button type="button" class="text-slate-400 hover:text-white text-sm" @click="showModal = false"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="p-6 space-y-4"><div><label class="block text-xs font-semibold text-slate-400 mb-1">Vehículo a Vincular *</label><select v-model="form.id_vehiculo" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer" required @change="onVehiculoChange"><option value="">Seleccione el vehículo...</option><option v-for="v in vehiculos" :key="v.id_vehiculo" :value="v.id_vehiculo">{{ v.placa }} - {{ v.marca }} {{ v.modelo }}</option></select></div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Vehículo a Vincular *</label
-            ><select
-              v-model="form.id_vehiculo"
-              class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
-              required
-            >
-              <option value="">Seleccione el vehículo...</option>
-              <option v-for="v in vehiculos" :key="v.id_vehiculo" :value="v.id_vehiculo">
-                {{ v.placa }} - {{ v.marca }} {{ v.modelo }}
-              </option>
+            <label for="repuesto-mantenimiento" class="block text-xs font-semibold text-slate-400 mb-1">Mantenimiento realizado *</label>
+            <select id="repuesto-mantenimiento" v-model="form.id_mantenimiento" :disabled="!form.id_vehiculo || mantenimientosDelVehiculo.length === 0" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer disabled:opacity-50" required>
+              <option value="">{{ !form.id_vehiculo ? 'Primero seleccione el vehículo...' : mantenimientosDelVehiculo.length ? 'Seleccione el mantenimiento...' : 'Este vehículo no tiene mantenimientos disponibles' }}</option>
+              <option v-for="m in mantenimientosDelVehiculo" :key="m.id_mantenimiento" :value="m.id_mantenimiento">#{{ m.id_mantenimiento }} · {{ m.fecha_servicio }} · {{ m.descripcion_falla }} ({{ m.estado }})</option>
             </select>
+            <p class="text-[10px] text-slate-500 mt-1">La factura aparecerá en el historial del vehículo, dentro de este mantenimiento.</p>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Número de factura</label
-            ><input
-              v-model.trim="form.numero_factura"
-              type="text"
-              maxlength="50"
-              placeholder="Se detecta del PDF si lo dejas vacío"
-              class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
-            />
-          </div>
-          <div
-            class="border-2 border-dashed border-slate-700 hover:border-sky-500/50 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-900/30 relative"
-          >
-            <input
-              type="file"
-              accept=".pdf"
-              required
-              class="absolute inset-0 opacity-0 cursor-pointer"
-              @change="form.comprobante_pdf = $event.target.files[0]"
-            /><i class="fa-solid fa-file-pdf text-3xl text-slate-500 mb-2 transition-colors"></i>
-            <p class="text-xs font-medium text-slate-300">
-              {{
-                form.comprobante_pdf?.name
-                  ? 'Archivo listo: ' + form.comprobante_pdf.name
-                  : 'Selecciona o arrastra el archivo legal (.pdf)'
-              }}
-            </p>
-            <p class="text-[10px] text-slate-500 mt-1">Tamaño máximo recomendado: 5MB</p>
+            <label for="repuesto-numero-factura" class="block text-xs font-semibold text-slate-400 mb-1">Número de factura *</label>
+            <input id="repuesto-numero-factura" v-model.trim="form.numero_factura" type="text" maxlength="50" required placeholder="Ej. FAC-2026-0042" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-400 mb-1">Cantidad Recibida *</label
-              ><input
-                v-model="form.cantidad_recibida"
-                type="number"
-                min="1"
-                class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
-              />
+              <label for="repuesto-nombre-pieza" class="block text-xs font-semibold text-slate-400 mb-1">Nombre de la pieza *</label>
+              <input id="repuesto-nombre-pieza" v-model.trim="form.nombre_pieza" type="text" maxlength="100" required placeholder="Ej. Filtro de aceite Bosch" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-400 mb-1">Costo Unitario ($) *</label
-              ><input
-                v-model="form.costo_unitario"
-                type="number"
-                step="0.01"
-                class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
-              />
+              <label for="repuesto-codigo-pieza" class="block text-xs font-semibold text-slate-400 mb-1">Código de pieza (opcional)</label>
+              <input id="repuesto-codigo-pieza" v-model.trim="form.codigo_pieza" type="text" maxlength="50" placeholder="Ej. SKU del proveedor" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
             </div>
+            <p class="col-span-2 text-[10px] text-slate-500">Cada factura registra una sola pieza. Para otra pieza del mismo mantenimiento, registra otra factura.</p>
           </div>
-        </div>
+          <div class="border-2 border-dashed border-slate-700 hover:border-sky-500/50 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-900/30 relative"><input ref="fileInput" type="file" accept=".pdf,application/pdf" required aria-label="Factura en PDF" class="absolute inset-0 opacity-0 cursor-pointer" @change="onFileChange"><i class="fa-solid fa-file-pdf text-3xl text-slate-500 mb-2 transition-colors"></i><p class="text-xs font-medium text-slate-300">{{ form.comprobante_pdf?.name ? 'Archivo listo: ' + form.comprobante_pdf.name : 'Selecciona o arrastra el archivo legal (.pdf)' }}</p><p class="text-[10px] text-slate-500 mt-1">Solo archivos .pdf · Tamaño máximo: 5 MB</p></div><div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-400 mb-1">Cantidad Recibida *</label><input v-model="form.cantidad_recibida" type="number" min="1" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></div><div><label class="block text-xs font-semibold text-slate-400 mb-1">Costo Unitario ($) *</label><input v-model="form.costo_unitario" type="number" step="0.01" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></div></div></div>
         <fieldset class="px-6 pb-6 space-y-3 text-sm text-slate-300">
-          <label class="flex items-center gap-2"
-            ><input v-model="conGarantia" type="checkbox" /> Registrar garantía del repuesto</label
-          >
+          <label class="flex items-center gap-2"><input v-model="conGarantia" type="checkbox"> Registrar garantía del repuesto</label>
           <p v-if="!conGarantia" class="text-xs text-slate-400">Se registrará sin garantía.</p>
           <template v-else>
-            <label class="block"
-              >Inicio de garantía<input
-                v-model="form.garantia_inicio"
-                type="date"
-                required
-                class="mt-1 block w-full rounded-lg bg-slate-900 p-2"
-            /></label>
-            <label class="block"
-              >Fecha de vencimiento<input
-                v-model="form.garantia_fin"
-                type="date"
-                :min="form.garantia_inicio"
-                required
-                class="mt-1 block w-full rounded-lg bg-slate-900 p-2"
-            /></label>
-            <p class="text-xs text-slate-400">
-              Confirma las fechas del proveedor. El vencimiento indica el primer día sin cobertura. Se avisará 30 días
-              antes y al vencer.
-            </p>
+            <label class="block">Inicio de garantía<input v-model="form.garantia_inicio" type="date" required class="mt-1 block w-full rounded-lg bg-slate-900 p-2"></label>
+            <label class="block">Fecha de vencimiento<input v-model="form.garantia_fin" type="date" :min="form.garantia_inicio" required class="mt-1 block w-full rounded-lg bg-slate-900 p-2"></label>
+            <p class="text-xs text-slate-400">Confirma las fechas del proveedor. El vencimiento indica el primer día sin cobertura. Se avisará 30 días antes y al vencer.</p>
           </template>
           <p v-if="error" role="alert" class="text-rose-400">{{ error }}</p>
         </fieldset>
-        <div class="px-6 py-4 bg-slate-900 border-t border-slate-800 flex justify-end gap-3">
-          <button
-            type="button"
-            :disabled="uploading"
-            class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 text-xs font-bold rounded-lg"
-            @click="showModal = false"
-          >
-            Cancelar</button
-          ><button
-            :disabled="uploading"
-            class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg disabled:opacity-50"
-          >
-            {{ uploading ? 'Guardando...' : 'Vincular al Stock' }}
-          </button>
-        </div>
+        <div class="px-6 py-4 bg-slate-900 border-t border-slate-800 flex justify-end gap-3"><button type="button" :disabled="uploading" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-slate-950 text-xs font-bold rounded-lg" @click="showModal = false">Cancelar</button><button :disabled="uploading" class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg disabled:opacity-50">{{ uploading ? 'Guardando...' : 'Vincular al Stock' }}</button></div>
       </form>
     </div>
   </section>

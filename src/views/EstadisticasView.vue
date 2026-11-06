@@ -1,14 +1,23 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
+const gananciasTotales = ref(0)
+const formatoUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const totalMantenimientos = ref(0)
 const vehiculosConMasServicios = ref([])
 const cargando = ref(true)
+const cargadas = ref(false)
 const error = ref('')
+let solicitudEnCurso = false
+let intervaloActualizacion
 
 async function cargarEstadisticas() {
-  cargando.value = true
+  if (solicitudEnCurso) return
+  solicitudEnCurso = true
+  if (!cargadas.value) cargando.value = true
   error.value = ''
 
   try {
@@ -16,15 +25,31 @@ async function cargarEstadisticas() {
 
     totalMantenimientos.value = response.data.total_mantenimientos
     vehiculosConMasServicios.value = response.data.vehiculos_con_mas_servicios
+    if (auth.isAdmin) gananciasTotales.value = response.data.ganancias_totales ?? 0
+    cargadas.value = true
   } catch (e) {
     console.error('Error al cargar las estadísticas:', e)
     error.value = 'No se pudieron cargar las estadísticas. Intenta nuevamente.'
   } finally {
     cargando.value = false
+    solicitudEnCurso = false
   }
 }
 
-onMounted(cargarEstadisticas)
+function actualizarSiVisible() {
+  if (document.visibilityState === 'visible') cargarEstadisticas()
+}
+
+onMounted(() => {
+  cargarEstadisticas()
+  intervaloActualizacion = window.setInterval(actualizarSiVisible, 30000)
+  document.addEventListener('visibilitychange', actualizarSiVisible)
+})
+
+onUnmounted(() => {
+  window.clearInterval(intervaloActualizacion)
+  document.removeEventListener('visibilitychange', actualizarSiVisible)
+})
 </script>
 
 <template>
@@ -56,8 +81,23 @@ onMounted(cargarEstadisticas)
       Cargando estadísticas...
     </div>
 
-    <template v-else>
+    <template v-else-if="cargadas">
       <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <article v-if="auth.isAdmin" class="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-sm text-slate-400">Ingresos por servicios completados</p>
+              <p class="text-3xl font-bold text-white mt-3">
+                {{ formatoUsd.format(gananciasTotales) }} USD
+              </p>
+              <p class="text-sm text-slate-500 mt-2">Total de mano de obra registrada</p>
+            </div>
+            <div class="w-14 h-14 shrink-0 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <i class="fa-solid fa-dollar-sign text-2xl"></i>
+            </div>
+          </div>
+        </article>
+
         <article class="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div class="flex items-center justify-between">
             <div>
