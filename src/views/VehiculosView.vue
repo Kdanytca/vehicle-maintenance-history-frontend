@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api'
+import RecepcionModal from '../components/RecepcionModal.vue'
 
 const vehiculos = ref([])
 const clientes = ref([])
@@ -11,6 +12,10 @@ const showForm = ref(false)
 const editingId = ref(null)
 const termino = ref('')
 const form = reactive({ placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
+// G2DS-16: datos de recepción que se piden al registrar el vehículo
+const NIVELES_COMBUSTIBLE = ['Vacío', '1/4', '1/2', '3/4', 'Lleno']
+const recepcion = reactive({ kilometraje: '', nivel_combustible: '', danos_visibles: '', observaciones: '' })
+const vehiculoRecepcion = ref(null)
 
 // Validación provisional del formato de placa definido para este PBI.
 const placaValida = computed(() =>
@@ -38,6 +43,7 @@ async function load() {
 
 function resetForm() {
   Object.assign(form, { placa: '', marca: '', modelo: '', anio: '', propietario: '', id_cliente: '' })
+  Object.assign(recepcion, { kilometraje: '', nivel_combustible: '', danos_visibles: '', observaciones: '' })
   editingId.value = null
   showForm.value = false
 }
@@ -112,8 +118,9 @@ async function save() {
       await api.put(`/vehiculos/${editingId.value}`, form)
       success.value = 'Vehiculo actualizado correctamente.'
     } else {
-      await api.post('/vehiculos', form)
-      success.value = 'Vehiculo registrado correctamente.'
+      // G2DS-16: el vehículo y su recepción se guardan juntos
+      await api.post('/vehiculos', { ...form, ...recepcion })
+      success.value = 'Vehículo y recepción registrados correctamente.'
     }
     resetForm()
     await load()
@@ -121,6 +128,8 @@ async function save() {
     error.value =
       exception.response?.data?.errors?.placa?.[0] ||
       exception.response?.data?.errors?.modelo?.[0] ||
+      exception.response?.data?.errors?.kilometraje?.[0] ||
+      exception.response?.data?.errors?.nivel_combustible?.[0] ||
       exception.response?.data?.message ||
       'No se pudo guardar el vehículo'
   }
@@ -314,6 +323,64 @@ watch(termino, () => {
           </p>
         </div>
       </div>
+      <!-- G2DS-16: recepción del vehículo (solo al registrar uno nuevo) -->
+      <div v-if="!editingId" class="space-y-4 pt-4 border-t border-slate-800/60">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-clipboard-check text-sky-400"></i> Recepción del vehículo
+          <span class="text-[11px] font-normal text-slate-500">Estado en que llega al taller</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Kilometraje</label>
+            <input
+              v-model="recepcion.kilometraje"
+              required
+              type="number"
+              min="0"
+              max="9999999"
+              placeholder="Ej: 45200"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 font-mono text-sm focus:outline-none focus:border-sky-500 transition"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2"
+              >Nivel de combustible</label
+            >
+            <select
+              v-model="recepcion.nivel_combustible"
+              required
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500 transition"
+            >
+              <option value="" disabled>Seleccionar</option>
+              <option v-for="nivel in NIVELES_COMBUSTIBLE" :key="nivel" :value="nivel">{{ nivel }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Daños visibles</label>
+            <textarea
+              v-model="recepcion.danos_visibles"
+              rows="2"
+              maxlength="1000"
+              placeholder="Ej: Rayón en puerta trasera derecha"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Observaciones</label>
+            <textarea
+              v-model="recepcion.observaciones"
+              rows="2"
+              maxlength="1000"
+              placeholder="Ej: Cliente reporta ruido al frenar"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition"
+            ></textarea>
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-500">
+          <i class="fa-regular fa-clock mr-1"></i>La fecha de recepción se guarda automáticamente.
+        </p>
+      </div>
+
       <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-lg text-sm">
         {{ error }}
       </p>
@@ -382,6 +449,11 @@ watch(termino, () => {
                   :to="`/vehiculos/${vehiculo.id_vehiculo}`"
                   class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-sky-500/10 text-sky-400 rounded text-xs"
                   ><i class="fa-solid fa-eye"></i> Ver</RouterLink
+                ><button
+                  class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-emerald-500/10 text-emerald-400 rounded text-xs"
+                  @click="vehiculoRecepcion = vehiculo"
+                >
+                  <i class="fa-solid fa-clipboard-check"></i> Ver recepción</button
                 ><button
                   class="inline-block px-2.5 py-1 bg-slate-800 hover:bg-blue-500/10 text-blue-400 rounded text-xs"
                   @click="edit(vehiculo)"
@@ -482,5 +554,7 @@ watch(termino, () => {
       </div>
     </div>
 
+    <!-- G2DS-16: detalle de la recepción -->
+    <RecepcionModal :vehiculo="vehiculoRecepcion" @close="vehiculoRecepcion = null" @saved="load" />
   </section>
 </template>
