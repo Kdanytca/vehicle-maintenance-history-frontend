@@ -22,6 +22,7 @@ const links = computed(() => [
   { to: '/reportes', label: 'Reportes', icon: 'fa-file-invoice' },
   ...(auth.isAdmin
     ? [
+        { to: '/repuestos/mas-utilizados', label: 'Repuestos Más Usados', icon: 'fa-chart-pie', admin: true },
         { to: '/garantias-vencidas', label: 'Garantías Vencidas', icon: 'fa-shield-halved', admin: true },
         { to: '/reportes/inactivos', label: 'Clientes Inactivos', icon: 'fa-user-clock', admin: true },
         { to: '/usuarios', label: 'Usuarios', icon: 'fa-users', admin: true },

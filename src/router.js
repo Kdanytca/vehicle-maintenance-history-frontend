@@ -15,6 +15,7 @@ import VehiculoDetalleView from './views/VehiculoDetalleView.vue'
 import ClientesView from './views/ClientesView.vue'
 import GarantiasVencidasView from './views/GarantiasVencidasView.vue'
 import ReporteInactivosView from './views/ReporteInactivosView.vue'
+import RepuestosMasUtilizadosView from './views/RepuestosMasUtilizadosView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -27,6 +28,7 @@ const router = createRouter({
     { path: '/mantenimientos', component: MantenimientosView, meta: { auth: true } },
     { path: '/estadisticas', component: EstadisticasView, meta: { auth: true } },
     { path: '/repuestos', component: RepuestosView, meta: { auth: true } },
+    { path: '/repuestos/mas-utilizados', component: RepuestosMasUtilizadosView, meta: { auth: true, admin: true } },
     { path: '/alertas', component: AlertasView, meta: { auth: true } },
     { path: '/garantias-vencidas', component: GarantiasVencidasView, meta: { auth: true, admin: true } },
     { path: '/historial', component: HistorialView, meta: { auth: true } },

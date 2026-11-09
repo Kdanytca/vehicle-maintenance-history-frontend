@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 import { facturaPdfUrl as pdfUrl, validarFacturaPdf } from '../utils/facturas'
 import {
   calcularEstadoGarantia,
@@ -8,6 +9,8 @@ import {
   obtenerMensajeVacio,
   obtenerVehiculoAsociado,
 } from '../utils/garantiaRepuesto'
+
+const auth = useAuthStore()
 
 const repuestos = ref([])
 const vehiculos = ref([])
@@ -28,6 +31,7 @@ const emptyForm = () => ({
   numero_factura: '',
   nombre_pieza: '',
   codigo_pieza: '',
+  proveedor: '',
   comprobante_pdf: null,
   cantidad_recibida: 1,
   costo_unitario: 0,
@@ -159,13 +163,23 @@ onMounted(load)
         <h1 class="text-2xl font-bold text-white tracking-tight">Inventario de Repuestos y Reposición</h1>
         <p class="text-sm text-slate-400">Control de stock, garantías vigentes/vencidas y facturas de compra.</p>
       </div>
-      <button
-        class="bg-sky-500 hover:bg-sky-600 transition-all text-slate-900 px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-sky-500/20 active:scale-95"
-        @click="openModal"
-      >
-        <i class="fa-solid fa-file-arrow-up text-xs"></i>
-        <span>Cargar Factura de Compra</span>
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <RouterLink
+          v-if="auth.isAdmin"
+          to="/repuestos/mas-utilizados"
+          class="bg-indigo-600 hover:bg-indigo-500 transition-all text-white px-3.5 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
+        >
+          <i class="fa-solid fa-chart-pie text-xs"></i>
+          <span>Repuestos Más Utilizados</span>
+        </RouterLink>
+        <button
+          class="bg-sky-500 hover:bg-sky-600 transition-all text-slate-900 px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-sky-500/20 active:scale-95"
+          @click="openModal"
+        >
+          <i class="fa-solid fa-file-arrow-up text-xs"></i>
+          <span>Cargar Factura de Compra</span>
+        </button>
+      </div>
     </div>
 
     <!-- Alertas -->
@@ -511,6 +525,17 @@ onMounted(load)
                 type="text"
                 maxlength="50"
                 placeholder="Ej. SKU del proveedor"
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+              >
+            </div>
+            <div class="col-span-2">
+              <label for="repuesto-proveedor" class="block text-xs font-semibold text-slate-400 mb-1">Proveedor / Marca (opcional)</label>
+              <input
+                id="repuesto-proveedor"
+                v-model.trim="form.proveedor"
+                type="text"
+                maxlength="100"
+                placeholder="Ej. Bosch, Brembo, Monroe, AutoPartes S.A."
                 class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
               >
             </div>

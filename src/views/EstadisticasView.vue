@@ -61,15 +61,26 @@ onUnmounted(() => {
         <p class="text-slate-400 mt-2">Resumen de los mantenimientos registrados y los vehículos con más servicios.</p>
       </div>
 
-      <button
-        type="button"
-        class="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold transition disabled:opacity-50"
-        :disabled="cargando"
-        @click="cargarEstadisticas"
-      >
-        <i class="fa-solid fa-rotate-right mr-2"></i>
-        Actualizar
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <RouterLink
+          v-if="auth.isAdmin"
+          to="/repuestos/mas-utilizados"
+          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-2 shadow-md"
+        >
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Repuestos Más Utilizados</span>
+        </RouterLink>
+
+        <button
+          type="button"
+          class="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold transition disabled:opacity-50"
+          :disabled="cargando"
+          @click="cargarEstadisticas"
+        >
+          <i class="fa-solid fa-rotate-right mr-2"></i>
+          Actualizar
+        </button>
+      </div>
     </header>
 
     <div v-if="error" class="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-300" role="alert">
