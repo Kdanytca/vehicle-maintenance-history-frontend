@@ -14,6 +14,7 @@ import VehiculosView from './views/VehiculosView.vue'
 import VehiculoDetalleView from './views/VehiculoDetalleView.vue'
 import ClientesView from './views/ClientesView.vue'
 import GarantiasVencidasView from './views/GarantiasVencidasView.vue'
+import ReporteInactivosView from './views/ReporteInactivosView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -31,6 +32,7 @@ const router = createRouter({
     { path: '/historial', component: HistorialView, meta: { auth: true } },
     { path: '/historial-cambios', component: HistorialCambiosView, meta: { auth: true, admin: true } },
     { path: '/reportes', component: ReportesView, meta: { auth: true } },
+    { path: '/reportes/inactivos', component: ReporteInactivosView, meta: { auth: true, admin: true } },
     { path: '/usuarios', component: UsuariosView, meta: { auth: true, admin: true } },
     { path: '/roles', component: RolesView, meta: { auth: true, admin: true } },
   ],
