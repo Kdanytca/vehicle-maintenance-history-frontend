@@ -20,13 +20,10 @@ const links = computed(() => [
   { to: '/alertas', label: 'Alertas', icon: 'fa-bell' },
   { to: '/historial', label: 'Historial', icon: 'fa-clock-rotate-left' },
   { to: '/reportes', label: 'Reportes', icon: 'fa-file-invoice' },
-  ...(auth.isAdmin
-    ? [
-        { to: '/usuarios', label: 'Usuarios', icon: 'fa-users', admin: true },
-        { to: '/roles', label: 'Permisos', icon: 'fa-shield-halved', admin: true },
-        { to: '/historial-cambios', label: 'Auditoría', icon: 'fa-clock-rotate-left', admin: true },
-      ]
-    : []),
+  ...(auth.isAdmin ? [
+    { to: '/usuarios', label: 'Usuarios', icon: 'fa-users', admin: true },
+    { to: '/roles', label: 'Permisos', icon: 'fa-shield-halved', admin: true },
+  ] : []),
 ])
 
 const linkRows = computed(() => {

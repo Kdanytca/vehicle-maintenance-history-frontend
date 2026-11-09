@@ -81,6 +81,15 @@ function formatPhone(value) {
   return cleaned
 }
 
+function formatNombre(value) {
+  const cleaned = String(value || '').replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '')
+  return cleaned.slice(0, 5)
+}
+
+function onNombreInput(e) {
+  form.nombre = formatNombre(e.target.value)
+}
+
 function onPhoneInput(e) {
   form.telefono = formatPhone(e.target.value)
 }
@@ -228,7 +237,7 @@ function openCreateForm() {
 
 function editCliente(cliente) {
   Object.assign(form, {
-    nombre: cliente.nombre || '',
+    nombre: formatNombre(cliente.nombre || ''),
     apellido: cliente.apellido || '',
     dui: cliente.dui || '',
     telefono: cliente.telefono || '',
@@ -245,6 +254,10 @@ async function saveCliente() {
 
   if (!form.nombre.trim() || !form.apellido.trim()) {
     error.value = 'El nombre y el apellido son obligatorios.'
+    return
+  }
+  if (form.nombre.trim().length > 5) {
+    error.value = 'El nombre debe tener como máximo 5 caracteres.'
     return
   }
   if (!form.dui.trim()) {
@@ -613,10 +626,13 @@ onMounted(load)
                 v-model="form.nombre"
                 required
                 type="text"
-                placeholder="Ej: Carlos"
+                maxlength="5"
+                placeholder="Ej: Carlo"
                 class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-sky-500 transition"
+                @input="onNombreInput"
               />
             </div>
+            <p class="text-[11px] text-slate-500 mt-1">Máximo 5 caracteres.</p>
           </div>
 
           <!-- Apellido -->
