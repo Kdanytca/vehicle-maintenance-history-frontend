@@ -1,70 +1,59 @@
-import { createRouter, createWebHistory } from "vue-router";
-import { useAuthStore } from "./stores/auth";
-import AlertasView from "./views/AlertasView.vue";
-import HistorialCambios from "./views/HistorialCambios.vue";
-import HistorialView from "./views/HistorialView.vue";
-import LoginView from "./views/LoginView.vue";
-import MantenimientosView from "./views/MantenimientosView.vue";
-import RepuestosView from "./views/RepuestosView.vue";
-import ReportesView from "./views/ReportesView.vue";
-import RolesView from "./views/RolesView.vue";
-import UsuariosView from "./views/UsuariosView.vue";
-import VehiculosView from "./views/VehiculosView.vue";
-import VehiculoDetalleView from "./views/VehiculoDetalleView.vue";
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from './stores/auth'
+import AlertasView from './views/AlertasView.vue'
+import EstadisticasView from './views/EstadisticasView.vue'
+import HistorialCambiosView from './views/HistorialCambios.vue'
+import HistorialView from './views/HistorialView.vue'
+import LoginView from './views/LoginView.vue'
+import MantenimientosView from './views/MantenimientosView.vue'
+import RepuestosView from './views/RepuestosView.vue'
+import ReportesView from './views/ReportesView.vue'
+import RolesView from './views/RolesView.vue'
+import UsuariosView from './views/UsuariosView.vue'
+import VehiculosView from './views/VehiculosView.vue'
+import VehiculoDetalleView from './views/VehiculoDetalleView.vue'
+import ClientesView from './views/ClientesView.vue'
+import GarantiasVencidasView from './views/GarantiasVencidasView.vue'
+import ReporteInactivosView from './views/ReporteInactivosView.vue'
+import RepuestosMasUtilizadosView from './views/RepuestosMasUtilizadosView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    {
-      path: "/login",
-      name: "login",
-      component: LoginView,
-      meta: { guest: true },
-    },
-    { path: "/", redirect: "/vehiculos" },
-    { path: "/vehiculos", component: VehiculosView, meta: { auth: true } },
-    {
-      path: "/vehiculos/:id",
-      component: VehiculoDetalleView,
-      meta: { auth: true },
-    },
-    {
-      path: "/mantenimientos",
-      component: MantenimientosView,
-      meta: { auth: true },
-    },
-    { path: "/repuestos", component: RepuestosView, meta: { auth: true } },
-    { path: "/alertas", component: AlertasView, meta: { auth: true } },
-    { path: "/historial", component: HistorialView, meta: { auth: true } },
-    {
-      path: "/historial-cambios",
-      component: HistorialCambios,
-      meta: { auth: true, admin: true },
-    },
-    { path: "/reportes", component: ReportesView, meta: { auth: true } },
-    {
-      path: "/usuarios",
-      component: UsuariosView,
-      meta: { auth: true, admin: true },
-    },
-    { path: "/roles", component: RolesView, meta: { auth: true, admin: true } },
+    { path: '/login', name: 'login', component: LoginView, meta: { guest: true } },
+    { path: '/', redirect: '/vehiculos' },
+    { path: '/vehiculos', component: VehiculosView, meta: { auth: true } },
+    { path: '/vehiculos/:id', component: VehiculoDetalleView, meta: { auth: true } },
+    { path: '/clientes', component: ClientesView, meta: { auth: true } },
+    { path: '/mantenimientos', component: MantenimientosView, meta: { auth: true } },
+    { path: '/estadisticas', component: EstadisticasView, meta: { auth: true } },
+    { path: '/repuestos', component: RepuestosView, meta: { auth: true } },
+    { path: '/repuestos/mas-utilizados', component: RepuestosMasUtilizadosView, meta: { auth: true, admin: true } },
+    { path: '/alertas', component: AlertasView, meta: { auth: true } },
+    { path: '/garantias-vencidas', component: GarantiasVencidasView, meta: { auth: true, admin: true } },
+    { path: '/historial', component: HistorialView, meta: { auth: true } },
+    { path: '/historial-cambios', component: HistorialCambiosView, meta: { auth: true, admin: true } },
+    { path: '/reportes', component: ReportesView, meta: { auth: true } },
+    { path: '/reportes/inactivos', component: ReporteInactivosView, meta: { auth: true, admin: true } },
+    { path: '/usuarios', component: UsuariosView, meta: { auth: true, admin: true } },
+    { path: '/roles', component: RolesView, meta: { auth: true, admin: true } },
   ],
-});
+})
 
 router.beforeEach((to) => {
-  const auth = useAuthStore();
+  const auth = useAuthStore()
 
   if (to.meta.auth && !auth.isAuthenticated) {
-    return "/login";
+    return '/login'
   }
 
   if (to.meta.admin && !auth.isAdmin) {
-    return "/vehiculos";
+    return '/vehiculos'
   }
 
   if (to.meta.guest && auth.isAuthenticated) {
-    return "/vehiculos";
+    return '/vehiculos'
   }
-});
+})
 
-export default router;
+export default router

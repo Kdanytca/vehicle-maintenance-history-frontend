@@ -35,6 +35,7 @@ onMounted(load)
     <p v-if="error" class="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-sm">{{ error }}</p>
 
     <div v-if="vehiculo" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <p v-if="vehiculo.deleted_at" class="lg:col-span-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">Vehículo archivado el {{ new Date(vehiculo.deleted_at).toLocaleString() }}. Disponible solo para consulta; sus registros y costos se conservan.</p>
       <div class="bg-[#1e293b] rounded-xl border border-slate-800 p-6 space-y-4 shadow-xl">
         <div class="text-center pb-4 border-b border-slate-800">
           <span class="bg-slate-900 text-sky-400 font-mono text-sm px-4 py-1.5 rounded-lg border border-slate-700 tracking-wider">{{ vehiculo.placa }}</span>

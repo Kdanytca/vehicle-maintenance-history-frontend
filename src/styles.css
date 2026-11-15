@@ -19,6 +19,49 @@ button, input, select, textarea { font: inherit; }
 
 .router-link-active { background: rgb(30 41 59 / 0.4); color: #38bdf8; }
 
+.request-activity-region {
+  position: fixed;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  right: 1rem;
+  left: 1rem;
+  z-index: 10000;
+  pointer-events: none;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.request-activity {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-width: 24rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #334155;
+  border-radius: 1rem;
+  background: #0f172a;
+  color: #f1f5f9;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.4);
+}
+
+.request-activity-gear {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  color: #38bdf8;
+  animation: request-activity-spin 2.5s linear infinite;
+}
+
+.request-activity-title { margin: 0; font-weight: 600; }
+.request-activity-message { margin: 0.25rem 0 0; font-size: 0.875rem; color: #94a3b8; }
+
+@keyframes request-activity-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .request-activity-gear { animation: none; }
+}
+
 @media (max-width: 800px) {
   table { display: block; overflow-x: auto; }
 }

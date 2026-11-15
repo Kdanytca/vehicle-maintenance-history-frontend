@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { trackApiActivity } from './requestActivity'
 
 function getStoredToken() {
   return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
@@ -17,6 +18,8 @@ const api = axios.create({
     Accept: 'application/json',
   },
 })
+
+trackApiActivity(api)
 
 api.interceptors.request.use((config) => {
   const token = getStoredToken()

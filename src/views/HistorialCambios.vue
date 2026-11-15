@@ -1,207 +1,237 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
-import api from "../api";
-import { useAuthStore } from "../stores/auth";
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '../api'
+import { useAuthStore } from '../stores/auth'
 
-const auth = useAuthStore();
-const router = useRouter();
-const registros = ref([]);
-const busqueda = ref("");
-const loading = ref(false);
-const error = ref("");
+const router = useRouter()
+const auth = useAuthStore()
 
-const registrosFiltrados = computed(() => {
-  const termino = busqueda.value.trim().toLocaleLowerCase();
+const historial = ref([])
+const cargando = ref(false)
+const error = ref('')
+const usuario = ref('')
+const fecha = ref('')
+const rol = ref('')
 
-  if (!termino) {
-    return registros.value;
+function formatearFecha(fecha) {
+  if (!fecha) {
+    return 'Sin fecha'
   }
 
-  return registros.value.filter((registro) =>
-    String(registro.user?.username ?? registro.user?.name ?? "")
-      .toLocaleLowerCase()
-      .includes(termino),
-  );
-});
+  const fechaObj = new Date(fecha)
 
-function formatDateTime(value) {
-  if (!value) return "N/A";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "N/A";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  })
-    .format(date)
-    .replace(",", "");
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(fechaObj)
 }
 
-async function load() {
-  if (!auth.isAdmin) {
-    await router.replace("/vehiculos");
-    return;
-  }
-
-  loading.value = true;
-  error.value = "";
+async function cargarHistorial() {
+  cargando.value = true
+  error.value = ''
 
   try {
-    const { data } = await api.get("/audit-logs");
-    registros.value = Array.isArray(data) ? data : (data.audit_logs ?? []);
+    const { data } = await api.get('/audit-logs', {
+      params: {
+        usuario: usuario.value || undefined,
+        fecha: fecha.value || undefined,
+        zona_horaria: fecha.value ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined,
+        rol: rol.value || undefined,
+      },
+    })
+    historial.value = data
   } catch (exception) {
     if (exception.response?.status === 403) {
-      await router.replace("/vehiculos");
-      return;
+      router.push('/vehiculos')
+      return
     }
 
-    error.value =
-      exception.response?.data?.message ||
-      "No se pudo cargar el historial de cambios.";
+    error.value = exception.response?.data?.message || 'No se pudo cargar el historial del sistema.'
   } finally {
-    loading.value = false;
+    cargando.value = false
   }
 }
 
-onMounted(load);
+function limpiarFiltros() {
+  usuario.value = ''
+  fecha.value = ''
+  rol.value = ''
+  cargarHistorial()
+}
+
+onMounted(() => {
+  if (!auth.isAdmin) {
+    router.push('/vehiculos')
+    return
+  }
+
+  cargarHistorial()
+})
 </script>
 
 <template>
-  <section class="space-y-6">
-    <header
-      class="flex flex-col gap-4 rounded-xl border border-slate-800/60 bg-[#0f172a] p-4 sm:flex-row sm:items-center sm:justify-between"
+  <section class="container mx-auto px-4 py-6 max-w-7xl">
+    <div
+      class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#0f172a] border border-slate-800/60 p-4 rounded-xl shadow-sm"
     >
       <div class="flex items-center gap-3">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10"
-        >
-          <i class="fa-solid fa-clock-rotate-left text-sm text-amber-400"></i>
+        <div class="w-10 h-10 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center">
+          <i class="fa-solid fa-clock-rotate-left text-violet-400 text-sm"></i>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-white">Historial de cambios</h1>
-          <p class="mt-0.5 text-xs text-slate-400">
-            Registro de actividad del sistema.
+          <h1 class="text-xl font-bold text-white">Historial de accesos y actividades</h1>
+          <p class="text-slate-400 text-xs mt-0.5">
+            Consulta de solo lectura para auditar accesos y acciones del sistema.
           </p>
         </div>
       </div>
+    </div>
 
-      <label class="relative w-full sm:max-w-sm">
-        <span class="sr-only">Buscar por nombre de usuario</span>
-        <i
-          class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-500"
-        ></i>
-        <input
-          v-model="busqueda"
-          type="search"
-          placeholder="Buscar por usuario..."
-          class="w-full rounded-lg border border-slate-800 bg-slate-900 py-3 pl-10 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
-        />
-      </label>
-    </header>
+    <div class="bg-[#1e293b] rounded-xl border border-slate-800 p-4 mb-4">
+      <form
+        class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end"
+        @submit.prevent="cargarHistorial"
+      >
+        <div>
+          <label for="filtro-usuario" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+            Filtrar por usuario
+          </label>
+          <input
+            id="filtro-usuario"
+            v-model="usuario"
+            type="text"
+            maxlength="100"
+            placeholder="Ej. admin"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-violet-500"
+          />
+        </div>
+        <div>
+          <label for="filtro-rol" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+            Filtrar por rol
+          </label>
+          <select
+            id="filtro-rol"
+            v-model="rol"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-violet-500"
+          >
+            <option value="">Todos los roles</option>
+            <option value="admin">Administrador</option>
+            <option value="mecanico">Mecánico</option>
+          </select>
+        </div>
+        <div>
+          <label for="filtro-fecha" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+            Filtrar por fecha
+          </label>
+          <input
+            id="filtro-fecha"
+            v-model="fecha"
+            type="date"
+            class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-violet-500"
+          />
+        </div>
+        <div class="flex gap-2">
+          <button
+            type="submit"
+            class="rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-500"
+          >
+            Filtrar
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-slate-700 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800"
+            @click="limpiarFiltros"
+          >
+            Limpiar
+          </button>
+        </div>
+      </form>
+    </div>
 
-    <p
-      v-if="error"
-      role="alert"
-      class="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-400"
-    >
+    <div v-if="error" class="mb-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-sm">
       {{ error }}
-    </p>
+    </div>
 
-    <div
-      class="overflow-hidden rounded-xl border border-slate-800 bg-[#1e293b] shadow-xl"
-    >
+    <div v-if="cargando" class="mb-4 flex items-center gap-2 text-violet-400 text-sm">
+      <span
+        class="inline-block h-4 w-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"
+      ></span>
+      Cargando historial...
+    </div>
+
+    <div class="bg-[#1e293b] rounded-xl border border-slate-800 overflow-hidden shadow-xl">
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[760px] text-left text-sm">
+        <table class="w-full text-left text-sm">
           <thead>
-            <tr
-              class="border-b border-slate-800 bg-slate-900/50 text-slate-400"
-            >
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider">
-                Usuario
-              </th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider">
-                Acción
-              </th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider">
-                Módulo
-              </th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider">
-                Descripción
-              </th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider">
-                Fecha y hora
-              </th>
+            <tr class="bg-slate-900/50 border-b border-slate-800 text-slate-400">
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Usuario</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Rol</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Fecha y hora</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Tipo de acceso</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Actividad / detalle</th>
             </tr>
           </thead>
 
           <tbody class="divide-y divide-slate-800/60 text-slate-300">
-            <tr v-if="loading">
-              <td
-                colspan="5"
-                class="px-4 py-12 text-center text-sky-400"
-                role="status"
-                aria-live="polite"
-              >
-                <i class="fa-solid fa-spinner fa-spin mr-2"></i>
-                Cargando historial...
+            <tr v-for="item in historial" :key="item.id" class="hover:bg-slate-800/30 transition-colors">
+              <td class="p-4 whitespace-nowrap text-slate-200 font-medium">
+                {{ item.usuario_nombre || item.usuario?.username || 'Sistema' }}
               </td>
-            </tr>
-
-            <tr v-else-if="registrosFiltrados.length === 0">
-              <td colspan="5" class="px-4 py-12 text-center text-slate-500">
-                <i
-                  class="fa-solid fa-folder-open mb-3 block text-3xl text-slate-600"
-                ></i>
-                <span class="text-sm font-medium">
+              <td class="p-4 whitespace-nowrap text-slate-300">
+                {{ item.rol_nombre || item.usuario?.rol?.nombre_rol || '—' }}
+              </td>
+              <td class="p-4 whitespace-nowrap font-mono text-xs text-slate-400">
+                {{ formatearFecha(item.created_at) }}
+              </td>
+              <td class="p-4 whitespace-nowrap">
+                <span
+                  :class="[
+                    'inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium',
+                    item.tipo_acceso === 'exitoso'
+                      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                      : item.tipo_acceso === 'fallido'
+                        ? 'border-rose-500/20 bg-rose-500/10 text-rose-300'
+                        : 'border-violet-500/20 bg-violet-500/10 text-violet-300',
+                  ]"
+                >
+                  <i
+                    :class="[
+                      'fa-solid',
+                      item.tipo_acceso === 'exitoso'
+                        ? 'fa-circle-check'
+                        : item.tipo_acceso === 'fallido'
+                          ? 'fa-circle-xmark'
+                          : 'fa-clock-rotate-left',
+                    ]"
+                  ></i>
                   {{
-                    busqueda
-                      ? "No hay cambios para el usuario buscado."
-                      : "No hay cambios registrados en el sistema"
+                    item.tipo_acceso === 'exitoso'
+                      ? 'Acceso exitoso'
+                      : item.tipo_acceso === 'fallido'
+                        ? 'Acceso fallido'
+                        : 'Actividad'
                   }}
+                </span>
+              </td>
+              <td class="p-4 text-slate-300 max-w-md">
+                <span v-if="item.tipo_acceso">{{ item.descripcion }}</span>
+                <span v-else>
+                  {{ item.accion }} · {{ item.modulo }} — {{ item.descripcion || 'Sin descripción' }}
                 </span>
               </td>
             </tr>
 
-            <template v-else>
-              <tr
-                v-for="registro in registrosFiltrados"
-                :key="registro.id"
-                class="transition-colors hover:bg-slate-800/30"
-              >
-                <td class="whitespace-nowrap p-4 font-medium text-white">
-                  {{
-                    registro.user?.username ||
-                    registro.user?.name ||
-                    "Usuario desconocido"
-                  }}
-                </td>
-                <td class="whitespace-nowrap p-4">
-                  <span
-                    class="rounded border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-400"
-                  >
-                    {{ registro.accion }}
-                  </span>
-                </td>
-                <td class="whitespace-nowrap p-4 text-slate-300">
-                  {{ registro.modulo }}
-                </td>
-                <td class="max-w-lg p-4 text-slate-400">
-                  {{ registro.descripcion || "Sin descripción" }}
-                </td>
-                <td
-                  class="whitespace-nowrap p-4 font-mono text-xs text-slate-400"
-                >
-                  {{ formatDateTime(registro.created_at) }}
-                </td>
-              </tr>
-            </template>
+            <tr v-if="!cargando && historial.length === 0">
+              <td colspan="5" class="px-4 py-12 text-center text-slate-500">
+                <i class="fa-solid fa-folder-open text-3xl mb-3 block text-slate-600"></i>
+                <span class="text-sm font-medium">No hay accesos ni actividades para los filtros seleccionados</span>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

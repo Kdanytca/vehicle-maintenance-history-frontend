@@ -1,249 +1,247 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
-import api from "../api";
-import { useAuthStore } from "../stores/auth";
+import { computed, onMounted, reactive, ref } from 'vue'
+import api from '../api'
+import { useAuthStore } from '../stores/auth'
 
-const auth = useAuthStore();
-const mantenimientos = ref([]);
-const usuarios = ref([]);
-const vehiculos = ref([]);
+const auth = useAuthStore()
+const mantenimientos = ref([])
+const usuarios = ref([])
+const vehiculos = ref([])
+
 const form = reactive({
-  fecha_servicio: "",
-  descripcion_falla: "",
-  estado: "Pendiente",
-  costo_mano_obra: "",
-  id_vehiculo: "",
-  id_usuario_encargado: "",
-});
+  fecha_servicio: '',
+  tipo_servicio: '',
+  descripcion_falla: '',
+  estado: 'Pendiente',
+  costo_mano_obra: '',
+  id_vehiculo: '',
+  id_usuario_encargado: '',
+})
 
-const showForm = ref(false);
-const editingId = ref(null);
-const error = ref("");
-const success = ref("");
-const mecanicoSeleccionado = ref("");
-const fechaInicio = ref("");
-const fechaFin = ref("");
-const filterError = ref("");
-const loading = ref(false);
+const showForm = ref(false)
+const editingId = ref(null)
+const error = ref('')
+const success = ref('')
+const mecanicoSeleccionado = ref('')
+const mantenimientoDetalle = ref(null)
+const fechaDesde = ref('')
+const fechaHasta = ref('')
+const cargando = ref(false)
 
-const hasDateRange = computed(() =>
-  Boolean(fechaInicio.value && fechaFin.value),
-);
-
-function getDateRangeParams() {
-  return hasDateRange.value
-    ? { fecha_inicio: fechaInicio.value, fecha_fin: fechaFin.value }
-    : {};
-}
-
-// Identifica el rol usando la relación que devuelve la API.
 function obtenerNombreRol(usuario) {
-  const rol = usuario.rol;
+  const rol = usuario.rol
 
-  if (typeof rol === "string") {
-    return rol.trim().toLowerCase();
+  if (typeof rol === 'string') {
+    return rol.trim().toLowerCase()
   }
 
-  return String(
-    rol?.nombre_rol ?? rol?.nombre ?? rol?.name ?? usuario.nombre_rol ?? "",
-  )
+  return String(rol?.nombre_rol ?? rol?.nombre ?? rol?.name ?? usuario.nombre_rol ?? '')
     .trim()
-    .toLowerCase();
+    .toLowerCase()
 }
 
-const mecanicos = computed(() =>
-  usuarios.value.filter((usuario) => obtenerNombreRol(usuario) === "mecanico"),
-);
-const estadosActivos = ["Pendiente", "En Proceso"];
+const mecanicos = computed(() => usuarios.value.filter((usuario) => obtenerNombreRol(usuario) === 'mecanico'))
+
+const estadosActivos = ['Pendiente', 'En Proceso']
 
 const plazasOcupadas = computed(() => {
-  const idMecanico = form.id_usuario_encargado;
+  const idMecanico = form.id_usuario_encargado
 
   if (!idMecanico || !estadosActivos.includes(form.estado)) {
-    return 0;
+    return 0
   }
+
   return mantenimientos.value.filter(
     (item) =>
       String(item.id_usuario_encargado) === String(idMecanico) &&
       estadosActivos.includes(item.estado) &&
-      String(item.id_mantenimiento) !== String(editingId.value ?? ""),
-  ).length;
-});
+      String(item.id_mantenimiento) !== String(editingId.value ?? ''),
+  ).length
+})
+
 const mecanicoSinCupo = computed(
-  () =>
-    Boolean(form.id_usuario_encargado) &&
-    estadosActivos.includes(form.estado) &&
-    plazasOcupadas.value >= 4,
-);
+  () => Boolean(form.id_usuario_encargado) && estadosActivos.includes(form.estado) && plazasOcupadas.value >= 4,
+)
 
 const mantenimientosFiltrados = computed(() => {
   if (!mecanicoSeleccionado.value) {
-    return mantenimientos.value;
+    return mantenimientos.value
   }
 
-  return mantenimientos.value.filter(
-    (item) =>
-      String(item.id_usuario_encargado) === String(mecanicoSeleccionado.value),
-  );
-});
+  return mantenimientos.value.filter((item) => String(item.id_usuario_encargado) === String(mecanicoSeleccionado.value))
+})
 
-const totalServicios = computed(() => mantenimientosFiltrados.value.length);
+const totalServicios = computed(() => mantenimientosFiltrados.value.length)
+const hayFiltroFecha = computed(() => Boolean(fechaDesde.value || fechaHasta.value))
+
+function validarRangoFechas() {
+  if (!fechaDesde.value || !fechaHasta.value) {
+    return true
+  }
+
+  if (new Date(fechaDesde.value) > new Date(fechaHasta.value)) {
+    error.value = 'La fecha "Desde" no puede ser mayor que la fecha "Hasta".'
+    return false
+  }
+
+  error.value = ''
+  return true
+}
 
 function badgeClass(estado) {
-  const value = String(estado || "")
+  const value = String(estado || '')
     .toLowerCase()
-    .replaceAll(" ", "_");
+    .replaceAll(' ', '_')
 
-  if (value === "pendiente") {
-    return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+  if (value === 'pendiente') {
+    return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
   }
 
-  if (value === "en_proceso") {
-    return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+  if (value === 'en_proceso') {
+    return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
   }
 
-  if (value === "completado") {
-    return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  if (value === 'completado') {
+    return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
   }
 
-  return "bg-rose-500/10 text-rose-400 border-rose-500/20";
+  return 'bg-rose-500/10 text-rose-400 border-rose-500/20'
 }
 
-async function load(params = {}) {
-  loading.value = true;
-  error.value = "";
-  filterError.value = "";
+async function load() {
+  cargando.value = true
+  error.value = ''
 
   try {
-    const { data } = await api.get("/mantenimientos", { params });
+    const params = {}
 
-    mantenimientos.value = data.mantenimientos;
-    usuarios.value = data.usuarios;
-    vehiculos.value = data.vehiculos;
+    if (fechaDesde.value) {
+      params.fecha_inicio = fechaDesde.value
+    }
+
+    if (fechaHasta.value) {
+      params.fecha_fin = fechaHasta.value
+    }
+
+    const { data } = await api.get('/mantenimientos', { params })
+
+    mantenimientos.value = data.mantenimientos
+    usuarios.value = data.usuarios
+    vehiculos.value = data.vehiculos
 
     if (!form.id_usuario_encargado && auth.user?.id_usuario) {
-      form.id_usuario_encargado = auth.user.id_usuario;
+      form.id_usuario_encargado = auth.user.id_usuario
     }
   } catch (exception) {
-    const message =
-      exception.response?.data?.errors?.fecha_inicio?.[0] ||
-      exception.response?.data?.errors?.fecha_fin?.[0] ||
-      exception.response?.data?.message ||
-      "No se pudieron cargar los mantenimientos.";
-
-    if (Object.keys(params).length > 0) {
-      filterError.value = message;
-    } else {
-      error.value = message;
-    }
+    error.value = exception.response?.data?.message || 'No se pudieron cargar los mantenimientos.'
   } finally {
-    loading.value = false;
+    cargando.value = false
   }
 }
 
-async function filterByDate() {
-  filterError.value = "";
-
-  if (!fechaInicio.value || !fechaFin.value) {
-    filterError.value = "Selecciona las dos fechas para filtrar el rango.";
-    return;
+async function aplicarFiltro() {
+  if (!validarRangoFechas()) {
+    return
   }
 
-  if (fechaInicio.value > fechaFin.value) {
-    filterError.value =
-      "La fecha desde no puede ser posterior a la fecha hasta.";
-    return;
-  }
-
-  await load(getDateRangeParams());
+  await load()
 }
 
-async function clearDateFilter() {
-  fechaInicio.value = "";
-  fechaFin.value = "";
-  filterError.value = "";
-  await load();
+function limpiarFiltros() {
+  fechaDesde.value = ''
+  fechaHasta.value = ''
+  error.value = ''
+  load()
 }
 
 async function save() {
-  error.value = "";
-  success.value = "";
+  error.value = ''
+  success.value = ''
 
   if (mecanicoSinCupo.value) {
     error.value =
-      "Este mecánico ya tiene cuatro vehículos asignados. Selecciona otro mecánico o espera a que libere una plaza.";
-    return;
+      'Este mecánico ya tiene cuatro vehículos asignados. Selecciona otro mecánico o espera a que libere una plaza.'
+    return
   }
 
   try {
     if (editingId.value) {
-      await api.put(`/mantenimientos/${editingId.value}`, form);
-      success.value = "Mantenimiento actualizado correctamente.";
+      await api.put(`/mantenimientos/${editingId.value}`, form)
+      success.value = 'Mantenimiento actualizado correctamente.'
     } else {
-      await api.post("/mantenimientos", form);
-      success.value = "Mantenimiento registrado correctamente.";
+      await api.post('/mantenimientos', form)
+      success.value = 'Mantenimiento registrado correctamente.'
     }
 
-    resetForm();
-    await load(getDateRangeParams());
+    resetForm()
+    await load()
   } catch (exception) {
     error.value =
       exception.response?.data?.errors?.id_usuario_encargado?.[0] ||
       exception.response?.data?.message ||
-      "No se pudo guardar el mantenimiento.";
+      'No se pudo guardar el mantenimiento.'
   }
 }
 
 async function cancel(id) {
-  if (
-    !confirm("¿Está seguro de que desea cancelar esta orden de mantenimiento?")
-  ) {
-    return;
+  if (!confirm('¿Está seguro de que desea cancelar esta orden de mantenimiento?')) {
+    return
   }
 
   try {
-    await api.delete(`/mantenimientos/${id}`);
-    success.value = "Orden de mantenimiento cancelada.";
-    error.value = "";
-    await load(getDateRangeParams());
+    await api.delete(`/mantenimientos/${id}`)
+    success.value = 'Orden de mantenimiento cancelada.'
+    error.value = ''
+    await load()
   } catch (exception) {
-    error.value =
-      exception.response?.data?.message ||
-      "No se pudo cancelar el mantenimiento.";
+    error.value = exception.response?.data?.message || 'No se pudo cancelar el mantenimiento.'
   }
 }
 
 function edit(item) {
   Object.assign(form, {
     fecha_servicio: item.fecha_servicio,
+    tipo_servicio: item.tipo_servicio || '',
     descripcion_falla: item.descripcion_falla,
     estado: item.estado,
     costo_mano_obra: item.costo_mano_obra,
     id_vehiculo: item.id_vehiculo,
     id_usuario_encargado: item.id_usuario_encargado,
-  });
+  })
 
-  editingId.value = item.id_mantenimiento;
-  showForm.value = true;
-  error.value = "";
+  editingId.value = item.id_mantenimiento
+  showForm.value = true
+  mantenimientoDetalle.value = null
+  error.value = ''
+}
+
+function verDetalle(item) {
+  mantenimientoDetalle.value = item
 }
 
 function resetForm() {
   Object.assign(form, {
-    fecha_servicio: "",
-    descripcion_falla: "",
-    estado: "Pendiente",
-    costo_mano_obra: "",
-    id_vehiculo: "",
-    id_usuario_encargado: auth.user?.id_usuario || "",
-  });
+    fecha_servicio: '',
+    tipo_servicio: '',
+    descripcion_falla: '',
+    estado: 'Pendiente',
+    costo_mano_obra: '',
+    id_vehiculo: '',
+    id_usuario_encargado: auth.user?.id_usuario || '',
+  })
 
-  editingId.value = null;
-  showForm.value = false;
-  error.value = "";
+  editingId.value = null
+  showForm.value = false
+  error.value = ''
 }
 
-onMounted(load);
+function abrirFormularioNuevo() {
+  editingId.value = null
+  resetForm()
+  showForm.value = true
+}
+
+onMounted(load)
 </script>
 
 <template>
@@ -252,28 +250,18 @@ onMounted(load);
       class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#0f172a] border border-slate-800/60 p-4 rounded-xl shadow-sm"
     >
       <div class="flex items-center gap-3">
-        <div
-          class="w-10 h-10 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-center justify-center"
-        >
+        <div class="w-10 h-10 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-center justify-center">
           <i class="fa-solid fa-wrench text-sky-400 text-sm"></i>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-white">
-            Listado de Mantenimientos
-          </h1>
-          <p class="text-slate-400 text-xs mt-0.5">
-            Historial y órdenes de servicio técnico en el taller.
-          </p>
+          <h1 class="text-xl font-bold text-white">Listado de Mantenimientos</h1>
+          <p class="text-slate-400 text-xs mt-0.5">Historial y órdenes de servicio técnico en el taller.</p>
         </div>
       </div>
 
       <button
         class="bg-sky-500 hover:bg-sky-600 transition text-slate-900 px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-sky-500/10"
-        @click="
-          showForm = true;
-          editingId = null;
-          error = '';
-        "
+        @click="abrirFormularioNuevo"
       >
         <i class="fa-solid fa-plus"></i> Nuevo Mantenimiento
       </button>
@@ -285,9 +273,7 @@ onMounted(load);
       @submit.prevent="save"
     >
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1"
-          >Fecha de Servicio *</label
-        >
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Fecha de Servicio *</label>
         <input
           v-model="form.fecha_servicio"
           required
@@ -297,43 +283,43 @@ onMounted(load);
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1"
-          >Vehículo *</label
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Tipo de Servicio</label>
+        <select
+          v-model="form.tipo_servicio"
+          class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
         >
+          <option value="">Seleccione el tipo de servicio...</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Predictivo">Predictivo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Vehículo *</label>
         <select
           v-model="form.id_vehiculo"
           required
           class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
         >
           <option value="">Seleccione el vehículo...</option>
-          <option
-            v-for="vehiculo in vehiculos"
-            :key="vehiculo.id_vehiculo"
-            :value="vehiculo.id_vehiculo"
-          >
+          <option v-for="vehiculo in vehiculos" :key="vehiculo.id_vehiculo" :value="vehiculo.id_vehiculo">
             {{ vehiculo.placa }} - {{ vehiculo.marca }} {{ vehiculo.modelo }}
           </option>
         </select>
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1"
-          >Encargado Interno *</label
-        >
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Encargado Interno *</label>
         <select
           v-model="form.id_usuario_encargado"
           required
           class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
         >
           <option value="">Seleccione el encargado...</option>
-          <option
-            v-for="mecanico in mecanicos"
-            :key="mecanico.id_usuario"
-            :value="mecanico.id_usuario"
-          >
-            {{ mecanico.username }} ({{
-              mecanico.rol?.nombre_rol || "sin rol"
-            }})
+          <option v-for="mecanico in mecanicos" :key="mecanico.id_usuario" :value="mecanico.id_usuario">
+            {{ mecanico.username }} ({{ mecanico.rol?.nombre_rol || 'sin rol' }})
           </option>
         </select>
         <p
@@ -341,15 +327,13 @@ onMounted(load);
           class="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
         >
           <i class="fa-solid fa-triangle-exclamation mr-1"></i>
-          Capacidad máxima alcanzada: este mecánico ya tiene cuatro vehículos
-          asignados. Selecciona otro mecánico o espera a que libere una plaza.
+          Capacidad máxima alcanzada: este mecánico ya tiene cuatro vehículos asignados. Selecciona otro mecánico o
+          espera a que libere una plaza.
         </p>
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1"
-          >Estado *</label
-        >
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Estado *</label>
         <select
           v-model="form.estado"
           required
@@ -363,9 +347,7 @@ onMounted(load);
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1"
-          >Costo Mano de Obra</label
-        >
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Costo Mano de Obra</label>
         <input
           v-model="form.costo_mano_obra"
           type="number"
@@ -374,10 +356,8 @@ onMounted(load);
         />
       </div>
 
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1"
-          >Descripción de Falla *</label
-        >
+      <div class="md:col-span-2">
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Descripción de Falla *</label>
         <textarea
           v-model="form.descripcion_falla"
           required
@@ -401,11 +381,9 @@ onMounted(load);
         >
           Cancelar
         </button>
-        <button
-          class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg"
-        >
+        <button class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-slate-900 text-xs font-bold rounded-lg">
           <i class="fa-solid fa-floppy-disk mr-1"></i>
-          {{ editingId ? "Actualizar Mantenimiento" : "Guardar Mantenimiento" }}
+          {{ editingId ? 'Actualizar Mantenimiento' : 'Guardar Mantenimiento' }}
         </button>
       </div>
     </form>
@@ -425,75 +403,67 @@ onMounted(load);
     </p>
 
     <div class="bg-[#1e293b] rounded-xl border border-slate-800 p-5 mb-4">
-      <div
-        class="mb-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 items-end"
-      >
-        <div>
-          <label
-            for="fecha-inicio"
-            class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"
-          >
-            Fecha desde
-          </label>
-          <input
-            id="fecha-inicio"
-            v-model="fechaInicio"
-            type="date"
-            class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
-          />
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+              Fecha desde
+            </label>
+            <input
+              v-model="fechaDesde"
+              type="date"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+              Fecha hasta
+            </label>
+            <input
+              v-model="fechaHasta"
+              type="date"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div class="flex items-end gap-2">
+            <button
+              type="button"
+              class="flex-1 bg-sky-500 hover:bg-sky-600 transition text-slate-900 px-4 py-3 rounded-lg font-bold text-xs uppercase tracking-wider"
+              @click="aplicarFiltro"
+            >
+              Filtrar
+            </button>
+
+            <button
+              type="button"
+              class="flex-1 bg-slate-700 hover:bg-slate-600 transition text-white px-4 py-3 rounded-lg font-bold text-xs uppercase tracking-wider"
+              @click="limpiarFiltros"
+            >
+              Limpiar
+            </button>
+          </div>
         </div>
 
-        <div>
-          <label
-            for="fecha-fin"
-            class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"
-          >
-            Fecha hasta
-          </label>
-          <input
-            id="fecha-fin"
-            v-model="fechaFin"
-            type="date"
-            class="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
-          />
-        </div>
-
-        <div class="flex gap-2 sm:col-span-2 xl:col-span-1">
-          <button
-            type="button"
-            class="flex-1 xl:flex-none bg-sky-500 hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition"
-            :disabled="loading"
-            @click="filterByDate"
-          >
-            <i class="fa-solid fa-filter mr-1.5"></i> Filtrar
-          </button>
-          <button
-            type="button"
-            class="flex-1 xl:flex-none bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-200 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition"
-            :disabled="loading"
-            @click="clearDateFilter"
-          >
-            <i class="fa-solid fa-xmark mr-1.5"></i> Limpiar
-          </button>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg px-5 py-3 min-w-40">
+          <p class="text-xs text-slate-400">Servicios encontrados</p>
+          <p class="text-2xl font-bold text-sky-400">{{ totalServicios }}</p>
         </div>
       </div>
 
-      <p
-        v-if="filterError"
-        role="alert"
-        class="mb-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm"
-      >
-        {{ filterError }}
-      </p>
+      <div v-if="cargando" class="mt-4 flex items-center gap-2 text-sky-400 text-sm">
+        <span
+          class="inline-block h-4 w-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"
+        ></span>
+        Cargando mantenimientos...
+      </div>
+    </div>
 
-      <div
-        class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
-      >
+    <div class="bg-[#1e293b] rounded-xl border border-slate-800 p-5 mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div class="flex-1">
-          <label
-            for="filtro-mecanico"
-            class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"
-          >
+          <label for="filtro-mecanico" class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
             Filtrar por mecánico responsable
           </label>
           <select
@@ -502,90 +472,40 @@ onMounted(load);
             class="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
           >
             <option value="">Todos los responsables</option>
-            <option
-              v-for="mecanico in mecanicos"
-              :key="mecanico.id_usuario"
-              :value="mecanico.id_usuario"
-            >
+            <option v-for="mecanico in mecanicos" :key="mecanico.id_usuario" :value="mecanico.id_usuario">
               {{ mecanico.username }}
             </option>
           </select>
         </div>
-
-        <div
-          class="bg-slate-900 border border-slate-800 rounded-lg px-5 py-3 min-w-40"
-        >
-          <p class="text-xs text-slate-400">Servicios encontrados</p>
-          <p class="text-2xl font-bold text-sky-400">{{ totalServicios }}</p>
-        </div>
       </div>
     </div>
 
-    <div
-      class="bg-[#1e293b] rounded-xl border border-slate-800 overflow-hidden shadow-xl"
-    >
+    <div class="bg-[#1e293b] rounded-xl border border-slate-800 overflow-hidden shadow-xl">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead>
-            <tr
-              class="bg-slate-900/50 border-b border-slate-800 text-slate-400"
-            >
-              <th class="p-4 font-semibold text-xs uppercase tracking-wider">
-                ID
-              </th>
-              <th class="p-4 font-semibold text-xs uppercase tracking-wider">
-                Fecha
-              </th>
-              <th class="p-4 font-semibold text-xs uppercase tracking-wider">
-                Descripción
-              </th>
-              <th class="p-4 font-semibold text-xs uppercase tracking-wider">
-                Estado
-              </th>
-              <th class="p-4 font-semibold text-xs uppercase tracking-wider">
-                Vehículo
-              </th>
-              <th class="p-4 font-semibold text-xs uppercase tracking-wider">
-                Encargado Interno
-              </th>
-              <th
-                class="p-4 font-semibold text-xs uppercase tracking-wider text-right"
-              >
-                Acciones
-              </th>
+            <tr class="bg-slate-900/50 border-b border-slate-800 text-slate-400">
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">ID</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Fecha</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Tipo de servicio</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Descripción</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Estado</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Vehículo</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider">Encargado Interno</th>
+              <th class="p-4 font-semibold text-xs uppercase tracking-wider text-right">Acciones</th>
             </tr>
           </thead>
 
           <tbody class="divide-y divide-slate-800/60 text-slate-300">
-            <tr v-if="loading">
-              <td
-                colspan="7"
-                class="px-4 py-12 text-center text-sky-400"
-                role="status"
-                aria-live="polite"
-              >
-                <i class="fa-solid fa-spinner fa-spin mr-2"></i>
-                Cargando mantenimientos...
-              </td>
-            </tr>
-
             <tr
-              v-else
               v-for="item in mantenimientosFiltrados"
               :key="item.id_mantenimiento"
               class="hover:bg-slate-800/30 transition-colors"
             >
-              <td class="p-4 font-mono text-xs text-slate-400">
-                {{ item.id_mantenimiento }}
-              </td>
-              <td
-                class="p-4 whitespace-nowrap text-slate-200 font-mono text-xs"
-              >
-                {{ item.fecha_servicio }}
-              </td>
-              <td class="p-4 max-w-xs truncate text-slate-300">
-                {{ item.descripcion_falla }}
-              </td>
+              <td class="p-4 font-mono text-xs text-slate-400">{{ item.id_mantenimiento }}</td>
+              <td class="p-4 whitespace-nowrap text-slate-200 font-mono text-xs">{{ item.fecha_servicio }}</td>
+              <td class="p-4 whitespace-nowrap text-slate-300">{{ item.tipo_servicio || 'No especificado' }}</td>
+              <td class="p-4 max-w-xs truncate text-slate-300">{{ item.descripcion_falla }}</td>
 
               <td class="p-4 whitespace-nowrap">
                 <span
@@ -598,31 +518,29 @@ onMounted(load);
                 </span>
               </td>
 
-              <td
-                class="p-4 whitespace-nowrap font-mono text-xs font-bold text-sky-400"
-              >
-                {{ item.vehiculo?.placa || "N/A" }}
+              <td class="p-4 whitespace-nowrap font-mono text-xs font-bold text-sky-400">
+                {{ item.vehiculo?.placa || 'N/A' }}
+                <span v-if="item.vehiculo?.deleted_at" class="block text-amber-400 text-xs">Archivado</span>
               </td>
 
               <td class="p-4 whitespace-nowrap">
-                <span
-                  v-if="item.encargado"
-                  class="inline-flex items-center gap-1.5 text-xs text-slate-300"
-                >
-                  <i
-                    class="fa-solid fa-user-gear text-[11px] text-slate-500"
-                  ></i
-                  >{{ item.encargado.username }} ({{
-                    item.encargado.rol?.nombre_rol || "sin rol"
-                  }})
+                <span v-if="item.encargado" class="inline-flex items-center gap-1.5 text-xs text-slate-300">
+                  <i class="fa-solid fa-user-gear text-[11px] text-slate-500"></i>
+                  {{ item.encargado.username }} ({{ item.encargado.rol?.nombre_rol || 'sin rol' }})
                 </span>
-                <span v-else class="text-xs text-slate-600 italic"
-                  >Sin asignar</span
-                >
+                <span v-else class="text-xs text-slate-600 italic">Sin asignar</span>
               </td>
 
               <td class="p-4 text-right space-x-1.5 whitespace-nowrap">
                 <button
+                  class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-sky-500/20 text-sky-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
+                  title="Ver detalle"
+                  @click="verDetalle(item)"
+                >
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+                <button
+                  v-if="!item.vehiculo?.deleted_at"
                   class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-blue-500/20 text-blue-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
                   title="Editar mantenimiento"
                   @click="edit(item)"
@@ -630,6 +548,7 @@ onMounted(load);
                   <i class="fa-solid fa-pen"></i>
                 </button>
                 <button
+                  v-if="!item.vehiculo?.deleted_at"
                   class="inline-flex items-center justify-center p-2 bg-slate-800 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium border border-slate-700/60 transition"
                   title="Cancelar orden"
                   @click="cancel(item.id_mantenimiento)"
@@ -639,24 +558,67 @@ onMounted(load);
               </td>
             </tr>
 
-            <tr v-if="!loading && mantenimientosFiltrados.length === 0">
-              <td colspan="7" class="px-4 py-12 text-center text-slate-500">
-                <i
-                  class="fa-solid fa-folder-open text-3xl mb-3 block text-slate-600"
-                ></i>
+            <tr v-if="mantenimientosFiltrados.length === 0">
+              <td colspan="8" class="px-4 py-12 text-center text-slate-500">
+                <i class="fa-solid fa-folder-open text-3xl mb-3 block text-slate-600"></i>
                 <span class="text-sm font-medium">
                   {{
-                    hasDateRange
-                      ? "No se encontraron mantenimientos en el rango seleccionado"
+                    hayFiltroFecha
+                      ? 'No se encontraron mantenimientos en el rango seleccionado'
                       : mecanicoSeleccionado
-                        ? "No hay mantenimientos registrados para el mecánico seleccionado."
-                        : "No se han registrado órdenes de mantenimiento en el sistema."
+                        ? 'No hay mantenimientos registrados para el mecánico seleccionado.'
+                        : 'No se han registrado órdenes de mantenimiento en el sistema.'
                   }}
                 </span>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div
+      v-if="mantenimientoDetalle"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      @click.self="mantenimientoDetalle = null"
+    >
+      <div class="w-full max-w-lg rounded-xl border border-slate-700 bg-[#1e293b] p-6 shadow-2xl">
+        <div class="mb-5 flex items-center justify-between">
+          <h2 class="text-lg font-bold text-white">
+            Detalle del mantenimiento #{{ mantenimientoDetalle.id_mantenimiento }}
+          </h2>
+          <button class="text-slate-400 hover:text-white" title="Cerrar detalle" @click="mantenimientoDetalle = null">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4 text-sm">
+          <div>
+            <p class="text-xs text-slate-400">Fecha de servicio</p>
+            <p class="mt-1 text-white">{{ mantenimientoDetalle.fecha_servicio || 'No disponible' }}</p>
+          </div>
+
+          <div>
+            <p class="text-xs text-slate-400">Tipo de servicio</p>
+            <p class="mt-1 text-white">{{ mantenimientoDetalle.tipo_servicio || 'No especificado' }}</p>
+          </div>
+
+          <div>
+            <p class="text-xs text-slate-400">Descripción de la falla</p>
+            <p class="mt-1 whitespace-pre-wrap text-white">
+              {{ mantenimientoDetalle.descripcion_falla || 'Sin descripción' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button
+            class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-sky-600"
+            @click="mantenimientoDetalle = null"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   </section>
